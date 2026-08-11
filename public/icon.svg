@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- 抹茶ラテのような可愛らしく柔らかいグラデーション -->
+    <linearGradient id="cuteMatcha" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#748B47" />
+      <stop offset="100%" stop-color="#4B612C" />
+    </linearGradient>
+  </defs>
+
+  <!-- メイン背景 -->
+  <rect width="512" height="512" rx="112" fill="url(#cuteMatcha)" />
+
+  <!-- 背景のふんわり水玉ドット -->
+  <circle cx="80" cy="90" r="45" fill="#F8F9F5" opacity="0.12" />
+  <circle cx="430" cy="110" r="60" fill="#F8F9F5" opacity="0.1" />
+  <circle cx="90" cy="420" r="55" fill="#F8F9F5" opacity="0.1" />
+  <circle cx="420" cy="400" r="40" fill="#F8F9F5" opacity="0.12" />
+  <circle cx="256" cy="65" r="22" fill="#F8F9F5" opacity="0.15" />
+  <circle cx="430" cy="430" r="35" fill="#F3A2B8" opacity="0.2" />
+
+  <!-- 可愛いステッチ（点線）の内枠フレーム -->
+  <rect x="24" y="24" width="464" height="464" rx="88" fill="none" stroke="#F8F9F5" stroke-width="3" stroke-dasharray="12 8" opacity="0.35" />
+
+  <!-- 中央配置のテキスト（サイズ大幅拡大） -->
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Hiragino Maru Gothic ProN', 'Zen Maru Gothic', sans-serif" text-anchor="middle">
+    <!-- 上段：いぶきの -->
+    <text x="256" y="215" font-weight="700" font-size="58" fill="#E8F0D8" letter-spacing="4">
+      いぶきの
+    </text>
+
+    <!-- 下段：人生経営 -->
+    <text x="256" y="325" font-weight="900" font-size="84" fill="#F8F9F5" letter-spacing="6">
+      人生経営
+    </text>
+  </g>
+</svg>

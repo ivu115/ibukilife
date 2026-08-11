@@ -1,0 +1,17 @@
+{
+    "name": "いぶきの人生経営",
+    "short_name": "いぶき経営",
+    "description": "あなたの人生を経営するための抹茶色 Life OS ダッシュボード",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#F8F9F5",
+    "theme_color": "#5b7039",
+    "icons": [
+      {
+        "src": "/icon.svg",
+        "sizes": "512x512",
+        "type": "image/svg+xml",
+        "purpose": "any maskable"
+      }
+    ]
+  }
