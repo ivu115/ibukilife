@@ -17,8 +17,7 @@ const zenKaku = Zen_Kaku_Gothic_New({
 
 export const metadata: Metadata = {
   title: 'いぶきの人生経営',
-  description:
-    '純資産・収支・貯金・タスク・AI顧問をひとつに。あなたの人生を経営するための抹茶色 Life OS ダッシュボード。',
+  description: '純資産・収支・貯金・タスク・AI顧問をひとつに。あなたの人生を経営するための抹茶色 Life OS ダッシュボード。',
   applicationName: 'いぶきの人生経営',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
@@ -28,9 +27,8 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: '/icon.svg',
-    apple: '/apple-icon.png',
+    apple: '/icon.svg', // ← ここを icon.svg に統一！
   },
-  generator: 'v0.app',
 }
 
 export const viewport: Viewport = {

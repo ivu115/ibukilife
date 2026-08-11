@@ -135,9 +135,9 @@ export default function LifeOSDashboard() {
             いぶきの人生経営 <span className="text-lg">🍵</span>
           </h1>
         </div>
-        <div className="w-10 h-10 rounded-full bg-[#5b7039] text-[#F8F9F5] font-black flex items-center justify-center text-sm shadow-md">
-          息
-        </div>
+        <div className="w-10 h-10 rounded-full bg-[#5b7039] text-white flex items-center justify-center text-xl shadow-md border-2 border-white/20">
+  🍵
+</div>
       </header>
 
       {/* ── メインコンテンツ ── */}
