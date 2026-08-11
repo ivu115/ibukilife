@@ -2,53 +2,50 @@
 
 import React, { useState } from 'react'
 import { 
-  Home, PlusCircle, CheckSquare, Bot, PiggyBank, Plus, Trash2, Calendar as CalendarIcon, 
-  TrendingUp, Wallet, ArrowUpRight, Check, X, ShieldAlert, Sparkles, Tag
+  Home, PlusCircle, CheckSquare, Bot, PiggyBank, Plus, Trash2, Edit3, Calendar as CalendarIcon, 
+  TrendingUp, Wallet, Check, X, Sparkles, Tag
 } from 'lucide-react'
 
 export default function LifeOSDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'input' | 'savings' | 'tasks' | 'ai'>('home')
 
-  // --- 1. カテゴリー自由追加のState ---
+  // --- 1. カテゴリー (CRUD) ---
   const [categories, setCategories] = useState<string[]>([
     '食費', '日用品', '交際費', '固定費', '自己投資', '趣味・娯楽'
   ])
   const [newCategoryInput, setNewCategoryInput] = useState('')
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
-  // --- 2. 目的別貯金（奨学金返済等）のState ---
+  // --- 2. 目的別貯金 (CRUD) ---
   const [savingsGoals, setSavingsGoals] = useState([
     { id: 1, name: '奨学金返済', target: 1500000, current: 450000, targetDate: '2028-03-31' },
     { id: 2, name: '旅行・特別資金', target: 500000, current: 200000, targetDate: '2027-08-31' },
     { id: 3, name: '緊急防衛資金', target: 1000000, current: 750000, targetDate: '2026-12-31' },
   ])
-  const [newGoalName, setNewGoalName] = useState('')
-  const [newGoalTarget, setNewGoalTarget] = useState('')
-  const [newGoalDate, setNewGoalDate] = useState('')
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false)
+  const [editingGoal, setEditingGoal] = useState<any | null>(null) // nullなら新規、値があれば編集
+  const [goalForm, setGoalForm] = useState({ name: '', target: '', current: '0', targetDate: '' })
 
-  // --- 3. タスク＆カレンダーのState ---
+  // --- 3. タスク (CRUD) ---
   const [tasks, setTasks] = useState([
     { id: 1, title: '今日の収支を記録する', category: 'お金', priority: '高', dueDate: '2026-08-11', completed: true },
     { id: 2, title: '新規プロジェクトの見積書送付', category: '仕事・キャリア', priority: '高', dueDate: '2026-08-12', completed: false },
     { id: 3, title: '積み立てNISA配分の見直し', category: 'お金', priority: '中', dueDate: '2026-08-15', completed: false },
     { id: 4, title: '30分の散歩でリフレッシュ', category: '健康・生活', priority: '低', dueDate: '2026-08-11', completed: false },
   ])
-  const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskCategory, setNewTaskCategory] = useState('お金')
-  const [newTaskPriority, setNewTaskPriority] = useState('中')
-  const [newTaskDueDate, setNewTaskDueDate] = useState(new Date().toISOString().split('T')[0])
-  const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list')
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<any | null>(null)
+  const [taskForm, setTaskForm] = useState({ title: '', category: 'お金', priority: '中', dueDate: new Date().toISOString().split('T')[0] })
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list')
 
-  // --- 収支入力のフォームState ---
+  // --- 収支入力State ---
   const [inputAmount, setInputAmount] = useState('')
   const [inputType, setInputType] = useState<'消費' | '浪費' | '投資' | '貯金'>('消費')
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
   const [selectedSavingsGoal, setSelectedSavingsGoal] = useState(savingsGoals[0]?.name || '')
   const [inputMemo, setInputMemo] = useState('')
 
-  // ハンドラー：カテゴリー追加
+  // ----------------【カテゴリー操作】----------------
   const handleAddCategory = () => {
     if (!newCategoryInput.trim()) return
     if (!categories.includes(newCategoryInput.trim())) {
@@ -56,53 +53,101 @@ export default function LifeOSDashboard() {
       setSelectedCategory(newCategoryInput.trim())
     }
     setNewCategoryInput('')
-    setIsCategoryModalOpen(false)
   }
 
-  // ハンドラー：貯金目標追加
-  const handleAddSavingsGoal = () => {
-    if (!newGoalName || !newGoalTarget) return
-    const newGoal = {
-      id: Date.now(),
-      name: newGoalName,
-      target: Number(newGoalTarget),
-      current: 0,
-      targetDate: newGoalDate || '2027-12-31',
+  const handleDeleteCategory = (catToDelete: string) => {
+    if (categories.length <= 1) return alert('カテゴリーは最低1つ必要です。')
+    setCategories(categories.filter(c => c !== catToDelete))
+    if (selectedCategory === catToDelete) setSelectedCategory(categories[0])
+  }
+
+  // ----------------【貯金目標操作】----------------
+  const handleOpenGoalModal = (goalToEdit?: any) => {
+    if (goalToEdit) {
+      setEditingGoal(goalToEdit)
+      setGoalForm({
+        name: goalToEdit.name,
+        target: String(goalToEdit.target),
+        current: String(goalToEdit.current),
+        targetDate: goalToEdit.targetDate,
+      })
+    } else {
+      setEditingGoal(null)
+      setGoalForm({ name: '', target: '', current: '0', targetDate: '' })
     }
-    setSavingsGoals([...savingsGoals, newGoal])
-    setNewGoalName('')
-    setNewGoalTarget('')
-    setNewGoalDate('')
+    setIsGoalModalOpen(true)
+  }
+
+  const handleSaveGoal = () => {
+    if (!goalForm.name || !goalForm.target) return
+    if (editingGoal) {
+      // 編集保存
+      setSavingsGoals(savingsGoals.map(g => g.id === editingGoal.id ? {
+        ...g,
+        name: goalForm.name,
+        target: Number(goalForm.target),
+        current: Number(goalForm.current),
+        targetDate: goalForm.targetDate || '2027-12-31'
+      } : g))
+    } else {
+      // 新規追加
+      const newGoal = {
+        id: Date.now(),
+        name: goalForm.name,
+        target: Number(goalForm.target),
+        current: Number(goalForm.current || 0),
+        targetDate: goalForm.targetDate || '2027-12-31',
+      }
+      setSavingsGoals([...savingsGoals, newGoal])
+    }
     setIsGoalModalOpen(false)
   }
 
-  // ハンドラー：タスク追加
-  const handleAddTask = () => {
-    if (!newTaskTitle.trim()) return
-    const newTask = {
-      id: Date.now(),
-      title: newTaskTitle,
-      category: newTaskCategory,
-      priority: newTaskPriority,
-      dueDate: newTaskDueDate,
-      completed: false,
+  const handleDeleteGoal = (id: number) => {
+    if (confirm('この貯金目標を削除しますか？')) {
+      setSavingsGoals(savingsGoals.filter(g => g.id !== id))
     }
-    setTasks([...tasks, newTask])
-    setNewTaskTitle('')
+  }
+
+  // ----------------【タスク操作】----------------
+  const handleOpenTaskModal = (taskToEdit?: any) => {
+    if (taskToEdit) {
+      setEditingTask(taskToEdit)
+      setTaskForm({
+        title: taskToEdit.title,
+        category: taskToEdit.category,
+        priority: taskToEdit.priority,
+        dueDate: taskToEdit.dueDate,
+      })
+    } else {
+      setEditingTask(null)
+      setTaskForm({ title: '', category: 'お金', priority: '中', dueDate: new Date().toISOString().split('T')[0] })
+    }
+    setIsTaskModalOpen(true)
+  }
+
+  const handleSaveTask = () => {
+    if (!taskForm.title.trim()) return
+    if (editingTask) {
+      // 編集保存
+      setTasks(tasks.map(t => t.id === editingTask.id ? { ...t, ...taskForm } : t))
+    } else {
+      // 新規追加
+      const newTask = { id: Date.now(), ...taskForm, completed: false }
+      setTasks([...tasks, newTask])
+    }
     setIsTaskModalOpen(false)
   }
 
-  // ハンドラー：タスク削除
   const handleDeleteTask = (id: number) => {
-    setTasks(tasks.filter(task => task.id !== id))
+    setTasks(tasks.filter(t => t.id !== id))
   }
 
-  // ハンドラー：タスク完了切替
   const handleToggleTask = (id: number) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
   }
 
-  // 収支記録の送信（貯金目的がある場合は貯金総額にも反映）
+  // 収支記録送信
   const handleRecordTransaction = () => {
     if (!inputAmount) return
     const amount = Number(inputAmount)
@@ -136,8 +181,8 @@ export default function LifeOSDashboard() {
           </h1>
         </div>
         <div className="w-10 h-10 rounded-full bg-[#5b7039] text-white flex items-center justify-center text-xl shadow-md border-2 border-white/20">
-  🍵
-</div>
+          🍵
+        </div>
       </header>
 
       {/* ── メインコンテンツ ── */}
@@ -304,7 +349,7 @@ export default function LifeOSDashboard() {
               </div>
             )}
 
-            {/* カテゴリー選択 ＆ カスタム追加 */}
+            {/* カテゴリー選択 ＆ 管理モーダルボタン */}
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-xs font-bold text-gray-500">カテゴリー</label>
@@ -312,7 +357,7 @@ export default function LifeOSDashboard() {
                   onClick={() => setIsCategoryModalOpen(true)}
                   className="text-[10px] font-bold text-[#5b7039] flex items-center gap-1 bg-[#F2F5ED] px-2 py-0.5 rounded-full"
                 >
-                  <Plus className="w-3 h-3"/> カテゴリーを追加
+                  <Tag className="w-3 h-3"/> カテゴリー編集・追加
                 </button>
               </div>
 
@@ -362,7 +407,7 @@ export default function LifeOSDashboard() {
                 <PiggyBank className="w-5 h-5 text-[#4B7092]"/> 目的別貯金・返済
               </h2>
               <button 
-                onClick={() => setIsGoalModalOpen(true)}
+                onClick={() => handleOpenGoalModal()}
                 className="text-xs bg-[#5b7039] text-white px-3 py-1.5 rounded-full font-bold flex items-center gap-1 shadow-sm"
               >
                 <Plus className="w-3.5 h-3.5"/> 新規目標
@@ -382,7 +427,7 @@ export default function LifeOSDashboard() {
               <p className="text-right text-[10px] font-bold text-[#F4C430]">達成率 {totalSavingsProgress}%</p>
             </div>
 
-            {/* 目標カード一覧 */}
+            {/* 目標カード一覧（編集・削除ボタン付き） */}
             <div className="space-y-3">
               {savingsGoals.map(goal => {
                 const percent = Math.min(100, Math.round((goal.current / goal.target) * 100))
@@ -395,22 +440,38 @@ export default function LifeOSDashboard() {
                         <h4 className="font-black text-sm text-[#3E4D27]">{goal.name}</h4>
                         <p className="text-[10px] text-gray-400 font-bold">目標日: {goal.targetDate}</p>
                       </div>
-                      <span className="text-xs font-black px-2.5 py-1 rounded-full bg-[#F0F5FA] text-[#4B7092]">
-                        {percent}% 完了
-                      </span>
+
+                      {/* 編集・削除アクション */}
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => handleOpenGoalModal(goal)}
+                          className="p-1.5 bg-[#F2F5ED] text-[#5b7039] rounded-xl hover:bg-[#E2E6D8] transition-all"
+                          title="編集"
+                        >
+                          <Edit3 className="w-3.5 h-3.5"/>
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteGoal(goal.id)}
+                          className="p-1.5 bg-[#FAF0F3] text-[#B84061] rounded-xl hover:bg-[#F3A2B8]/20 transition-all"
+                          title="削除"
+                        >
+                          <Trash2 className="w-3.5 h-3.5"/>
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs font-bold">
-                        <span className="text-gray-500">現在: ¥{goal.current.toLocaleString()}</span>
+                        <span className="text-[#4B7092]">現在: ¥{goal.current.toLocaleString()}</span>
                         <span className="text-gray-400">目標: ¥{goal.target.toLocaleString()}</span>
                       </div>
                       <div className="h-2.5 w-full bg-[#F2F5ED] rounded-full overflow-hidden">
                         <div style={{ width: `${percent}%` }} className="h-full bg-[#5b7039] rounded-full transition-all"></div>
                       </div>
-                      <p className="text-[10px] text-right font-bold text-gray-400">
-                        あと ¥{remaining.toLocaleString()}
-                      </p>
+                      <div className="flex justify-between text-[10px] font-bold">
+                        <span className="text-[#5b7039]">{percent}% 達成</span>
+                        <span className="text-gray-400">あと ¥{remaining.toLocaleString()}</span>
+                      </div>
                     </div>
                   </div>
                 )
@@ -427,7 +488,7 @@ export default function LifeOSDashboard() {
                 <CheckSquare className="w-5 h-5 text-[#5b7039]"/> 事業・生活タスク
               </h2>
               <button 
-                onClick={() => setIsTaskModalOpen(true)}
+                onClick={() => handleOpenTaskModal()}
                 className="text-xs bg-[#5b7039] text-white px-3 py-1.5 rounded-full font-bold flex items-center gap-1 shadow-sm"
               >
                 <Plus className="w-3.5 h-3.5"/> タスク追加
@@ -475,14 +536,23 @@ export default function LifeOSDashboard() {
                       </div>
                     </div>
 
-                    {/* ゴミ箱で削除 */}
-                    <button 
-                      onClick={() => handleDeleteTask(task.id)}
-                      className="text-gray-300 hover:text-red-500 p-1 transition-colors"
-                      title="削除"
-                    >
-                      <Trash2 className="w-4 h-4"/>
-                    </button>
+                    {/* 編集・削除ボタン */}
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={() => handleOpenTaskModal(task)}
+                        className="text-gray-300 hover:text-[#5b7039] p-1 transition-colors"
+                        title="編集"
+                      >
+                        <Edit3 className="w-4 h-4"/>
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteTask(task.id)}
+                        className="text-gray-300 hover:text-red-500 p-1 transition-colors"
+                        title="削除"
+                      >
+                        <Trash2 className="w-4 h-4"/>
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -551,88 +621,133 @@ export default function LifeOSDashboard() {
 
       </main>
 
-      {/* ── カテゴリー追加 モーダル ── */}
+      {/* ── カテゴリー編集・追加 モーダル ── */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
           <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">新しいカテゴリーを追加</h3>
+              <h3 className="font-bold text-sm text-[#3E4D27]">カテゴリー管理</h3>
               <button onClick={() => setIsCategoryModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
             </div>
-            <input 
-              type="text"
-              placeholder="例: サブスク、ペット代"
-              value={newCategoryInput}
-              onChange={(e) => setNewCategoryInput(e.target.value)}
-              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-            />
-            <button 
-              onClick={handleAddCategory}
-              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
-            >
-              追加する
-            </button>
+
+            {/* 新規追加フォーム */}
+            <div className="flex gap-2">
+              <input 
+                type="text"
+                placeholder="新しいカテゴリー"
+                value={newCategoryInput}
+                onChange={(e) => setNewCategoryInput(e.target.value)}
+                className="w-full p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+              <button 
+                onClick={handleAddCategory}
+                className="px-4 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shrink-0"
+              >
+                追加
+              </button>
+            </div>
+
+            {/* カテゴリー一覧と削除 */}
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <p className="text-[10px] font-bold text-gray-400">現在のカテゴリー (タップで削除)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map(cat => (
+                  <span 
+                    key={cat} 
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F2F5ED] text-xs font-bold text-[#3E4D27] rounded-xl"
+                  >
+                    {cat}
+                    <button onClick={() => handleDeleteCategory(cat)} className="text-gray-400 hover:text-red-500">
+                      <X className="w-3 h-3"/>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── 貯金目標追加 モーダル ── */}
+      {/* ── 貯金目標（新規・編集） モーダル ── */}
       {isGoalModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
           <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">新しい貯金目標を追加</h3>
+              <h3 className="font-bold text-sm text-[#3E4D27]">
+                {editingGoal ? '貯金目標の編集' : '新規貯金目標を追加'}
+              </h3>
               <button onClick={() => setIsGoalModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
             </div>
-            <input 
-              type="text"
-              placeholder="目標名 (例: 車の買い替え)"
-              value={newGoalName}
-              onChange={(e) => setNewGoalName(e.target.value)}
-              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-            />
-            <input 
-              type="number"
-              placeholder="目標金額 (円)"
-              value={newGoalTarget}
-              onChange={(e) => setNewGoalTarget(e.target.value)}
-              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-            />
-            <input 
-              type="date"
-              value={newGoalDate}
-              onChange={(e) => setNewGoalDate(e.target.value)}
-              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
-            />
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">目標名</label>
+              <input 
+                type="text"
+                placeholder="例: 車の買い替え"
+                value={goalForm.name}
+                onChange={(e) => setGoalForm({ ...goalForm, name: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">目標金額 (円)</label>
+              <input 
+                type="number"
+                placeholder="目標金額"
+                value={goalForm.target}
+                onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">現在の蓄積額 (円)</label>
+              <input 
+                type="number"
+                placeholder="現在の貯蓄額"
+                value={goalForm.current}
+                onChange={(e) => setGoalForm({ ...goalForm, current: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">目標達成日</label>
+              <input 
+                type="date"
+                value={goalForm.targetDate}
+                onChange={(e) => setGoalForm({ ...goalForm, targetDate: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
+              />
+            </div>
             <button 
-              onClick={handleAddSavingsGoal}
+              onClick={handleSaveGoal}
               className="w-full py-3 bg-[#4B7092] text-white font-bold text-xs rounded-2xl shadow-md"
             >
-              目標を作成する
+              {editingGoal ? '変更を保存する' : '目標を作成する'}
             </button>
           </div>
         </div>
       )}
 
-      {/* ── タスク追加 モーダル ── */}
+      {/* ── タスク（新規・編集） モーダル ── */}
       {isTaskModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
           <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
             <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">タスクを追加</h3>
+              <h3 className="font-bold text-sm text-[#3E4D27]">
+                {editingTask ? 'タスクの編集' : 'タスクを追加'}
+              </h3>
               <button onClick={() => setIsTaskModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
             </div>
             <input 
               type="text"
               placeholder="タスク内容"
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
+              value={taskForm.title}
+              onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
               className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
             />
             <div className="flex gap-2">
               <select 
-                value={newTaskCategory}
-                onChange={(e) => setNewTaskCategory(e.target.value)}
+                value={taskForm.category}
+                onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
                 className="w-1/2 p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
               >
                 <option value="お金">お金</option>
@@ -641,8 +756,8 @@ export default function LifeOSDashboard() {
                 <option value="自己投資">自己投資</option>
               </select>
               <select 
-                value={newTaskPriority}
-                onChange={(e) => setNewTaskPriority(e.target.value)}
+                value={taskForm.priority}
+                onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
                 className="w-1/2 p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
               >
                 <option value="高">優先度: 高</option>
@@ -650,17 +765,20 @@ export default function LifeOSDashboard() {
                 <option value="低">優先度: 低</option>
               </select>
             </div>
-            <input 
-              type="date"
-              value={newTaskDueDate}
-              onChange={(e) => setNewTaskDueDate(e.target.value)}
-              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
-            />
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">期限日</label>
+              <input 
+                type="date"
+                value={taskForm.dueDate}
+                onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
+              />
+            </div>
             <button 
-              onClick={handleAddTask}
+              onClick={handleSaveTask}
               className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
             >
-              タスクを追加する
+              {editingTask ? '変更を保存する' : 'タスクを追加する'}
             </button>
           </div>
         </div>
