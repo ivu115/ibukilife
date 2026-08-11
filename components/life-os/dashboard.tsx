@@ -9,12 +9,14 @@ import { AIAdvisor } from './ai-advisor'
 import { BottomNav } from './bottom-nav'
 import { QuickInputSheet } from './quick-input-sheet'
 import { MoneyScreen } from './money-screen'
+import { SavingsScreen } from './savings-screen'
 import { TasksScreen } from './tasks-screen'
 import { AIScreen } from './ai-screen'
 
 const headings: Record<string, { sub: string; title: string }> = {
   home: { sub: 'おかえりなさい、経営者さん', title: '抹茶 Life OS 🍵' },
   money: { sub: 'サッと記録しましょう', title: '収支入力 ⚡' },
+  savings: { sub: '目標までコツコツと', title: '貯金 🐷' },
   tasks: { sub: '今日のミッション', title: 'タスク ✓' },
   ai: { sub: 'あなたの経営を診断', title: 'AI顧問 🍵' },
 }
@@ -53,6 +55,7 @@ export function Dashboard() {
           </>
         )}
         {activeTab === 'money' && <MoneyScreen />}
+        {activeTab === 'savings' && <SavingsScreen />}
         {activeTab === 'tasks' && <TasksScreen />}
         {activeTab === 'ai' && <AIScreen />}
       </main>

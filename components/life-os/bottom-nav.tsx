@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Wallet, ListChecks, Bot } from 'lucide-react'
+import { Home, Wallet, PiggyBank, ListChecks, Bot } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 interface NavItem {
@@ -11,7 +11,8 @@ interface NavItem {
 
 const items: NavItem[] = [
   { key: 'home', label: 'ホーム', icon: Home },
-  { key: 'money', label: '収支入力', icon: Wallet },
+  { key: 'money', label: '収支', icon: Wallet },
+  { key: 'savings', label: '貯金', icon: PiggyBank },
   { key: 'tasks', label: 'タスク', icon: ListChecks },
   { key: 'ai', label: 'AI顧問', icon: Bot },
 ]
@@ -38,7 +39,7 @@ export function BottomNav({
                 type="button"
                 onClick={() => onChange(item.key)}
                 aria-current={isActive ? 'page' : undefined}
-                className="flex flex-col items-center gap-0.5 rounded-full px-3 py-1.5 transition-colors"
+                className="flex flex-col items-center gap-0.5 rounded-full px-2 py-1.5 transition-colors"
               >
                 <span
                   className={`flex h-9 w-9 items-center justify-center rounded-full transition-all duration-300 ${
