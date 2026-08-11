@@ -3,40 +3,50 @@
 import React, { useState } from 'react'
 import { 
   Home, PlusCircle, CheckSquare, Bot, PiggyBank, Plus, Trash2, Edit3, Calendar as CalendarIcon, 
-  TrendingUp, Wallet, Check, X, Sparkles, Tag
+  TrendingUp, Wallet, Check, X, Sparkles, Tag, Send, Loader2
 } from 'lucide-react'
 
 export default function LifeOSDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'input' | 'savings' | 'tasks' | 'ai'>('home')
 
-  // --- 1. カテゴリー (CRUD) ---
+  // --- BS (純資産・資産・負債) の初期数値：ALL 0 ---
+  const [bsData, setBsData] = useState({ assets: 0, liabilities: 0 })
+  const [isBsModalOpen, setIsBsModalOpen] = useState(false)
+  const [bsForm, setBsForm] = useState({ assets: '0', liabilities: '0' })
+
+  // --- PL (今月の収支) の初期数値：ALL 0 ---
+  const [plData, setPlData] = useState({ consumption: 0, waste: 0, investment: 0, savings: 0 })
+
+  // --- カテゴリー (初期セット) ---
   const [categories, setCategories] = useState<string[]>([
     '食費', '日用品', '交際費', '固定費', '自己投資', '趣味・娯楽'
   ])
   const [newCategoryInput, setNewCategoryInput] = useState('')
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
-  // --- 2. 目的別貯金 (CRUD) ---
+  // --- 目的別貯金 (初期状態：0) ---
   const [savingsGoals, setSavingsGoals] = useState([
-    { id: 1, name: '奨学金返済', target: 1500000, current: 450000, targetDate: '2028-03-31' },
-    { id: 2, name: '旅行・特別資金', target: 500000, current: 200000, targetDate: '2027-08-31' },
-    { id: 3, name: '緊急防衛資金', target: 1000000, current: 750000, targetDate: '2026-12-31' },
+    { id: 1, name: '奨学金返済', target: 1000000, current: 0, targetDate: '2028-03-31' },
   ])
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false)
-  const [editingGoal, setEditingGoal] = useState<any | null>(null) // nullなら新規、値があれば編集
+  const [editingGoal, setEditingGoal] = useState<any | null>(null)
   const [goalForm, setGoalForm] = useState({ name: '', target: '', current: '0', targetDate: '' })
 
-  // --- 3. タスク (CRUD) ---
+  // --- タスク (初期状態) ---
   const [tasks, setTasks] = useState([
-    { id: 1, title: '今日の収支を記録する', category: 'お金', priority: '高', dueDate: '2026-08-11', completed: true },
-    { id: 2, title: '新規プロジェクトの見積書送付', category: '仕事・キャリア', priority: '高', dueDate: '2026-08-12', completed: false },
-    { id: 3, title: '積み立てNISA配分の見直し', category: 'お金', priority: '中', dueDate: '2026-08-15', completed: false },
-    { id: 4, title: '30分の散歩でリフレッシュ', category: '健康・生活', priority: '低', dueDate: '2026-08-11', completed: false },
+    { id: 1, title: '初日の収支を記録する', category: 'お金', priority: '高', dueDate: new Date().toISOString().split('T')[0], completed: false },
   ])
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<any | null>(null)
   const [taskForm, setTaskForm] = useState({ title: '', category: 'お金', priority: '中', dueDate: new Date().toISOString().split('T')[0] })
   const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list')
+
+  // --- AIチャットState ---
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string }>>([
+    { sender: 'ai', text: 'おかえりなさい！いぶき経営者さん。今日の財務状況や目標、タスクについて何でも相談してくださいね！🍵' }
+  ])
+  const [chatInput, setChatInput] = useState('')
+  const [isAiLoading, setIsAiLoading] = useState(false)
 
   // --- 収支入力State ---
   const [inputAmount, setInputAmount] = useState('')
@@ -44,6 +54,15 @@ export default function LifeOSDashboard() {
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
   const [selectedSavingsGoal, setSelectedSavingsGoal] = useState(savingsGoals[0]?.name || '')
   const [inputMemo, setInputMemo] = useState('')
+
+  // ----------------【BS操作】----------------
+  const handleSaveBs = () => {
+    setBsData({
+      assets: Number(bsForm.assets || 0),
+      liabilities: Number(bsForm.liabilities || 0)
+    })
+    setIsBsModalOpen(false)
+  }
 
   // ----------------【カテゴリー操作】----------------
   const handleAddCategory = () => {
@@ -81,7 +100,6 @@ export default function LifeOSDashboard() {
   const handleSaveGoal = () => {
     if (!goalForm.name || !goalForm.target) return
     if (editingGoal) {
-      // 編集保存
       setSavingsGoals(savingsGoals.map(g => g.id === editingGoal.id ? {
         ...g,
         name: goalForm.name,
@@ -90,7 +108,6 @@ export default function LifeOSDashboard() {
         targetDate: goalForm.targetDate || '2027-12-31'
       } : g))
     } else {
-      // 新規追加
       const newGoal = {
         id: Date.now(),
         name: goalForm.name,
@@ -129,10 +146,8 @@ export default function LifeOSDashboard() {
   const handleSaveTask = () => {
     if (!taskForm.title.trim()) return
     if (editingTask) {
-      // 編集保存
       setTasks(tasks.map(t => t.id === editingTask.id ? { ...t, ...taskForm } : t))
     } else {
-      // 新規追加
       const newTask = { id: Date.now(), ...taskForm, completed: false }
       setTasks([...tasks, newTask])
     }
@@ -147,27 +162,96 @@ export default function LifeOSDashboard() {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
   }
 
+  // ----------------【AIチャット送信】----------------
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || isAiLoading) return
+    const userMsg = chatInput.trim()
+    setChatMessages(prev => [...prev, { sender: 'user', text: userMsg }])
+    setChatInput('')
+    setIsAiLoading(true)
+
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMsg,
+          context: {
+            netWorth,
+            assets: bsData.assets,
+            liabilities: bsData.liabilities,
+            totalExpense,
+            consumption: plData.consumption,
+            waste: plData.waste,
+            investment: plData.investment,
+          }
+        })
+      })
+      const data = await res.json()
+      setChatMessages(prev => [...prev, { sender: 'ai', text: data.reply }])
+    } catch {
+      setChatMessages(prev => [...prev, { sender: 'ai', text: '通信エラーが発生しました。もう一度送信してください！' }])
+    } finally {
+      setIsAiLoading(false)
+    }
+  }
+
   // 収支記録送信
-  const handleRecordTransaction = () => {
+  const handleRecordTransaction = async () => {
     if (!inputAmount) return
     const amount = Number(inputAmount)
 
-    if (inputType === '貯金' && selectedSavingsGoal) {
-      setSavingsGoals(savingsGoals.map(g => 
-        g.name === selectedSavingsGoal ? { ...g, current: g.current + amount } : g
-      ))
+    if (inputType === '消費') setPlData(prev => ({ ...prev, consumption: prev.consumption + amount }))
+    if (inputType === '浪費') setPlData(prev => ({ ...prev, waste: prev.waste + amount }))
+    if (inputType === '投資') setPlData(prev => ({ ...prev, investment: prev.investment + amount }))
+    
+    if (inputType === '貯金') {
+      setPlData(prev => ({ ...prev, savings: prev.savings + amount }))
+      if (selectedSavingsGoal) {
+        setSavingsGoals(savingsGoals.map(g => g.name === selectedSavingsGoal ? { ...g, current: g.current + amount } : g))
+      }
+      setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
+    } else {
+      setBsData(prev => ({ ...prev, assets: Math.max(0, prev.assets - amount) }))
     }
 
-    alert(`【${inputType}】¥${amount.toLocaleString()} を記録しました！`)
+    try {
+      await fetch('/api/sheet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addTransaction',
+          data: {
+            type: inputType,
+            amount: amount,
+            category: selectedCategory,
+            savingsGoal: inputType === '貯金' ? selectedSavingsGoal : '',
+            memo: inputMemo,
+            date: new Date().toISOString().split('T')[0]
+          }
+        })
+      })
+      alert(`【${inputType}】¥${amount.toLocaleString()} を記録し、スプレッドシートに保存しました！`)
+    } catch (e) {
+      alert(`【${inputType}】¥${amount.toLocaleString()} を記録しました`)
+    }
+
     setInputAmount('')
     setInputMemo('')
     setActiveTab('home')
   }
 
-  // 計算プロパティ
+  // 動的計算プロパティ
+  const totalExpense = plData.consumption + plData.waste + plData.investment
+  const consumptionRatio = totalExpense > 0 ? Math.round((plData.consumption / totalExpense) * 100) : 0
+  const wasteRatio = totalExpense > 0 ? Math.round((plData.waste / totalExpense) * 100) : 0
+  const investmentRatio = totalExpense > 0 ? Math.round((plData.investment / totalExpense) * 100) : 0
+
+  const netWorth = bsData.assets - bsData.liabilities
+
   const totalSavingsTarget = savingsGoals.reduce((sum, g) => sum + g.target, 0)
   const totalSavingsCurrent = savingsGoals.reduce((sum, g) => sum + g.current, 0)
-  const totalSavingsProgress = Math.round((totalSavingsCurrent / totalSavingsTarget) * 100) || 0
+  const totalSavingsProgress = totalSavingsTarget > 0 ? Math.round((totalSavingsCurrent / totalSavingsTarget) * 100) : 0
 
   return (
     <div className="min-h-screen bg-[#F8F9F5] text-[#2C3527] font-sans pb-28 max-w-md mx-auto relative shadow-2xl overflow-hidden rounded-3xl border border-[#E2E6D8]">
@@ -195,20 +279,28 @@ export default function LifeOSDashboard() {
             <div className="bg-gradient-to-br from-[#5b7039] to-[#3B4A23] text-[#F8F9F5] p-6 rounded-3xl shadow-xl space-y-4 relative overflow-hidden">
               <div className="flex justify-between items-center text-xs text-[#D1DCB8] font-bold">
                 <span className="flex items-center gap-1"><Wallet className="w-4 h-4"/> 純資産 (BS)</span>
-                <span className="bg-[#F4C430] text-[#2C3527] px-2 py-0.5 rounded-full font-black text-[10px]">前月比 +4.2%</span>
+                <button 
+                  onClick={() => {
+                    setBsForm({ assets: String(bsData.assets), liabilities: String(bsData.liabilities) })
+                    setIsBsModalOpen(true)
+                  }}
+                  className="bg-white/20 text-white px-2.5 py-0.5 rounded-full font-bold text-[10px] hover:bg-white/30 transition-all flex items-center gap-1"
+                >
+                  <Edit3 className="w-3 h-3"/> 初期資産を設定
+                </button>
               </div>
               <div>
                 <p className="text-xs text-[#D1DCB8]">現在の純資産</p>
-                <p className="text-3xl font-black tracking-tight">¥3,350,000</p>
+                <p className="text-3xl font-black tracking-tight">¥{netWorth.toLocaleString()}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
                 <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
                   <p className="text-[#D1DCB8]">総資産</p>
-                  <p className="font-bold text-sm">¥4,820,000</p>
+                  <p className="font-bold text-sm">¥{bsData.assets.toLocaleString()}</p>
                 </div>
                 <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
                   <p className="text-[#D1DCB8]">負債 (奨学金等)</p>
-                  <p className="font-bold text-sm">¥1,470,000</p>
+                  <p className="font-bold text-sm">¥{bsData.liabilities.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -219,14 +311,13 @@ export default function LifeOSDashboard() {
                 <h3 className="font-bold text-sm text-[#3E4D27] flex items-center gap-1">
                   <TrendingUp className="w-4 h-4 text-[#748B47]"/> 今月の収支 (PL)
                 </h3>
-                <span className="text-xs text-gray-500 font-bold">支出 ¥350,000</span>
+                <span className="text-xs text-gray-500 font-bold">支出 ¥{totalExpense.toLocaleString()}</span>
               </div>
 
-              {/* 比率プログレスバー */}
               <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden flex">
-                <div style={{ width: '52%' }} className="bg-[#5b7039]" title="消費 52%"></div>
-                <div style={{ width: '18%' }} className="bg-[#F3A2B8]" title="浪費 18%"></div>
-                <div style={{ width: '30%' }} className="bg-[#F4C430]" title="投資 30%"></div>
+                <div style={{ width: `${consumptionRatio}%` }} className="bg-[#5b7039]"></div>
+                <div style={{ width: `${wasteRatio}%` }} className="bg-[#F3A2B8]"></div>
+                <div style={{ width: `${investmentRatio}%` }} className="bg-[#F4C430]"></div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center pt-1">
@@ -234,22 +325,22 @@ export default function LifeOSDashboard() {
                   <p className="text-[10px] text-gray-600 font-bold flex items-center justify-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-[#5b7039]"></span>消費
                   </p>
-                  <p className="font-black text-sm text-[#3E4D27]">52%</p>
-                  <p className="text-[9px] text-gray-400">¥182,000</p>
+                  <p className="font-black text-sm text-[#3E4D27]">{consumptionRatio}%</p>
+                  <p className="text-[9px] text-gray-400">¥{plData.consumption.toLocaleString()}</p>
                 </div>
                 <div className="bg-[#FAF0F3] p-2.5 rounded-2xl">
                   <p className="text-[10px] text-gray-600 font-bold flex items-center justify-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-[#F3A2B8]"></span>浪費
                   </p>
-                  <p className="font-black text-sm text-[#B84061]">18%</p>
-                  <p className="text-[9px] text-gray-400">¥63,000</p>
+                  <p className="font-black text-sm text-[#B84061]">{wasteRatio}%</p>
+                  <p className="text-[9px] text-gray-400">¥{plData.waste.toLocaleString()}</p>
                 </div>
                 <div className="bg-[#FAF6E6] p-2.5 rounded-2xl">
                   <p className="text-[10px] text-gray-600 font-bold flex items-center justify-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-[#F4C430]"></span>投資
                   </p>
-                  <p className="font-black text-sm text-[#927110]">30%</p>
-                  <p className="text-[9px] text-gray-400">¥105,000</p>
+                  <p className="font-black text-sm text-[#927110]">{investmentRatio}%</p>
+                  <p className="text-[9px] text-gray-400">¥{plData.investment.toLocaleString()}</p>
                 </div>
               </div>
             </div>
@@ -266,26 +357,30 @@ export default function LifeOSDashboard() {
               </div>
 
               <div className="space-y-2">
-                {tasks.slice(0, 3).map(task => (
-                  <div key={task.id} className="flex items-center justify-between p-3 bg-[#F9FAF6] rounded-2xl border border-[#EFEGE6]">
-                    <div className="flex items-center gap-3">
-                      <button 
-                        onClick={() => handleToggleTask(task.id)}
-                        className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
-                          task.completed ? 'bg-[#5b7039] border-[#5b7039] text-white' : 'border-gray-300'
-                        }`}
-                      >
-                        {task.completed && <Check className="w-3 h-3"/>}
-                      </button>
-                      <span className={`text-xs font-bold ${task.completed ? 'line-through text-gray-400' : 'text-[#3E4D27]'}`}>
-                        {task.title}
+                {tasks.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-2">タスクはありません</p>
+                ) : (
+                  tasks.slice(0, 3).map(task => (
+                    <div key={task.id} className="flex items-center justify-between p-3 bg-[#F9FAF6] rounded-2xl border border-[#EFEGE6]">
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => handleToggleTask(task.id)}
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
+                            task.completed ? 'bg-[#5b7039] border-[#5b7039] text-white' : 'border-gray-300'
+                          }`}
+                        >
+                          {task.completed && <Check className="w-3 h-3"/>}
+                        </button>
+                        <span className={`text-xs font-bold ${task.completed ? 'line-through text-gray-400' : 'text-[#3E4D27]'}`}>
+                          {task.title}
+                        </span>
+                      </div>
+                      <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-gray-200 font-bold text-gray-600">
+                        {task.category}
                       </span>
                     </div>
-                    <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-gray-200 font-bold text-gray-600">
-                      {task.category}
-                    </span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           </>
@@ -298,7 +393,6 @@ export default function LifeOSDashboard() {
               <PlusCircle className="w-5 h-5 text-[#5b7039]"/> 収支・貯金の記録
             </h2>
 
-            {/* 区分選択 */}
             <div className="grid grid-cols-4 gap-2">
               {(['消費', '浪費', '投資', '貯金'] as const).map(type => (
                 <button
@@ -318,7 +412,6 @@ export default function LifeOSDashboard() {
               ))}
             </div>
 
-            {/* 金額入力 */}
             <div>
               <label className="text-xs font-bold text-gray-500 block mb-1">金額 (円)</label>
               <div className="relative">
@@ -333,7 +426,6 @@ export default function LifeOSDashboard() {
               </div>
             </div>
 
-            {/* 貯金目的選択（貯金の場合のみ） */}
             {inputType === '貯金' && (
               <div>
                 <label className="text-xs font-bold text-[#4B7092] block mb-1">貯金の目的 (ポッド)</label>
@@ -349,7 +441,6 @@ export default function LifeOSDashboard() {
               </div>
             )}
 
-            {/* カテゴリー選択 ＆ 管理モーダルボタン */}
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-xs font-bold text-gray-500">カテゴリー</label>
@@ -378,7 +469,6 @@ export default function LifeOSDashboard() {
               </div>
             </div>
 
-            {/* メモ */}
             <div>
               <label className="text-xs font-bold text-gray-500 block mb-1">メモ</label>
               <input 
@@ -414,7 +504,6 @@ export default function LifeOSDashboard() {
               </button>
             </div>
 
-            {/* 全体達成率カード */}
             <div className="bg-gradient-to-r from-[#4B7092] to-[#2E4A63] text-white p-5 rounded-3xl shadow-md space-y-2">
               <p className="text-xs text-[#D0E0F0] font-bold">全体積立進捗</p>
               <div className="flex justify-between items-baseline">
@@ -427,10 +516,9 @@ export default function LifeOSDashboard() {
               <p className="text-right text-[10px] font-bold text-[#F4C430]">達成率 {totalSavingsProgress}%</p>
             </div>
 
-            {/* 目標カード一覧（編集・削除ボタン付き） */}
             <div className="space-y-3">
               {savingsGoals.map(goal => {
-                const percent = Math.min(100, Math.round((goal.current / goal.target) * 100))
+                const percent = goal.target > 0 ? Math.min(100, Math.round((goal.current / goal.target) * 100)) : 0
                 const remaining = Math.max(0, goal.target - goal.current)
 
                 return (
@@ -441,19 +529,16 @@ export default function LifeOSDashboard() {
                         <p className="text-[10px] text-gray-400 font-bold">目標日: {goal.targetDate}</p>
                       </div>
 
-                      {/* 編集・削除アクション */}
                       <div className="flex items-center gap-1">
                         <button 
                           onClick={() => handleOpenGoalModal(goal)}
                           className="p-1.5 bg-[#F2F5ED] text-[#5b7039] rounded-xl hover:bg-[#E2E6D8] transition-all"
-                          title="編集"
                         >
                           <Edit3 className="w-3.5 h-3.5"/>
                         </button>
                         <button 
                           onClick={() => handleDeleteGoal(goal.id)}
                           className="p-1.5 bg-[#FAF0F3] text-[#B84061] rounded-xl hover:bg-[#F3A2B8]/20 transition-all"
-                          title="削除"
                         >
                           <Trash2 className="w-3.5 h-3.5"/>
                         </button>
@@ -495,7 +580,6 @@ export default function LifeOSDashboard() {
               </button>
             </div>
 
-            {/* 切替トグル */}
             <div className="bg-[#EFEGE6] p-1 rounded-2xl flex text-xs font-bold">
               <button 
                 onClick={() => setTaskViewMode('list')}
@@ -511,7 +595,6 @@ export default function LifeOSDashboard() {
               </button>
             </div>
 
-            {/* リスト表示 */}
             {taskViewMode === 'list' && (
               <div className="space-y-2">
                 {tasks.map(task => (
@@ -536,19 +619,16 @@ export default function LifeOSDashboard() {
                       </div>
                     </div>
 
-                    {/* 編集・削除ボタン */}
                     <div className="flex items-center gap-1">
                       <button 
                         onClick={() => handleOpenTaskModal(task)}
                         className="text-gray-300 hover:text-[#5b7039] p-1 transition-colors"
-                        title="編集"
                       >
                         <Edit3 className="w-4 h-4"/>
                       </button>
                       <button 
                         onClick={() => handleDeleteTask(task.id)}
                         className="text-gray-300 hover:text-red-500 p-1 transition-colors"
-                        title="削除"
                       >
                         <Trash2 className="w-4 h-4"/>
                       </button>
@@ -558,7 +638,6 @@ export default function LifeOSDashboard() {
               </div>
             )}
 
-            {/* カレンダー表示 */}
             {taskViewMode === 'calendar' && (
               <div className="bg-white p-5 rounded-3xl shadow-sm border border-[#E8EDE0] space-y-3">
                 <p className="text-xs font-bold text-center text-[#3E4D27]">2026年 8月</p>
@@ -583,43 +662,112 @@ export default function LifeOSDashboard() {
           </div>
         )}
 
-        {/* ================= AI TAB (AI顧問 抹茶さん) ================= */}
+        {/* ================= AI TAB (対話型 AI顧問 抹茶さん) ================= */}
         {activeTab === 'ai' && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-[#3E4D27] to-[#5b7039] text-white p-6 rounded-3xl shadow-lg space-y-3">
+            {/* AIヘッダー */}
+            <div className="bg-gradient-to-r from-[#3E4D27] to-[#5b7039] text-white p-5 rounded-3xl shadow-lg space-y-2">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl shadow-inner">
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl shadow-inner border border-white/30">
                   🍵
                 </div>
                 <div>
-                  <h3 className="font-black text-base">専属AI顧問 抹茶さん</h3>
-                  <p className="text-[10px] text-[#D1DCB8] font-bold">経営診断ランク: A (極めて順調)</p>
+                  <h3 className="font-black text-base flex items-center gap-1">
+                    専属AI顧問 抹茶さん <Sparkles className="w-4 h-4 text-[#F4C430]"/>
+                  </h3>
+                  <p className="text-[10px] text-[#D1DCB8] font-bold">いつでも財務・生活経営のご相談をどうぞ</p>
                 </div>
               </div>
-              <p className="text-xs leading-relaxed text-[#F8F9F5] bg-black/10 p-3 rounded-2xl">
-                「いぶき経営者さん、今月は投資比率30%を達成できており、自己投資と資産形成のバランスが非常に優秀です！」
-              </p>
             </div>
 
-            <div className="bg-white p-5 rounded-3xl shadow-sm border border-[#E8EDE0] space-y-3">
-              <h4 className="text-xs font-black text-[#3E4D27] flex items-center gap-1">
-                <Sparkles className="w-4 h-4 text-[#F4C430]"/> 抹茶AIからの経営改善提案
-              </h4>
-              <div className="space-y-2 text-xs">
-                <div className="p-3 bg-[#F2F5ED] rounded-2xl border-l-4 border-[#5b7039]">
-                  <p className="font-bold text-[#3E4D27]">1. 奨学金返済の加速アドバイス</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">浪費額をあと¥10,000抑えて繰り上げ返済に回すと、完済目標が3ヶ月早まります。</p>
-                </div>
-                <div className="p-3 bg-[#FAF0F3] rounded-2xl border-l-4 border-[#F3A2B8]">
-                  <p className="font-bold text-[#B84061]">2. 固定費の定期レビュー</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">サブスクリプション利用状況のチェックタスクを来週追加しましょう。</p>
-                </div>
+            {/* チャット対話エリア */}
+            <div className="bg-white rounded-3xl p-4 shadow-sm border border-[#E8EDE0] space-y-3 min-h-[320px] flex flex-col justify-between">
+              {/* 吹き出し一覧 */}
+              <div className="space-y-3 overflow-y-auto max-h-[300px] p-1">
+                {chatMessages.map((msg, idx) => (
+                  <div key={idx} className={`flex gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    {msg.sender === 'ai' && (
+                      <div className="w-7 h-7 rounded-full bg-[#5b7039] text-white text-xs font-bold flex items-center justify-center shrink-0">
+                        🍵
+                      </div>
+                    )}
+                    <div className={`p-3 rounded-2xl text-xs font-bold max-w-[80%] leading-relaxed ${
+                      msg.sender === 'user' 
+                        ? 'bg-[#5b7039] text-white rounded-br-none shadow-sm' 
+                        : 'bg-[#F2F5ED] text-[#2C3527] rounded-bl-none border border-[#E2E6D8]'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {isAiLoading && (
+                  <div className="flex gap-2 items-center text-xs text-gray-400 font-bold p-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#5b7039]"/> 抹茶さんが考え中...
+                  </div>
+                )}
+              </div>
+
+              {/* チャット入力欄 */}
+              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                <input 
+                  type="text"
+                  placeholder="今月の節約アドバイスをちょうだい..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendChatMessage()}
+                  className="flex-1 bg-[#F8F9F5] px-4 py-3 rounded-2xl text-xs font-bold outline-none border border-[#E2E6D8]"
+                />
+                <button 
+                  onClick={handleSendChatMessage}
+                  disabled={isAiLoading}
+                  className="bg-[#5b7039] text-white p-3 rounded-2xl hover:bg-[#4A5D2C] transition-all shadow-md shrink-0 disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4"/>
+                </button>
               </div>
             </div>
           </div>
         )}
 
       </main>
+
+      {/* ── BS 設定 モーダル ── */}
+      {isBsModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-[#3E4D27]">初期資産・負債の設定</h3>
+              <button onClick={() => setIsBsModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">現在の総資産 (銀行口座・現金など)</label>
+              <input 
+                type="number"
+                placeholder="0"
+                value={bsForm.assets}
+                onChange={(e) => setBsForm({ ...bsForm, assets: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">現在の負債 (奨学金・ローンなど)</label>
+              <input 
+                type="number"
+                placeholder="0"
+                value={bsForm.liabilities}
+                onChange={(e) => setBsForm({ ...bsForm, liabilities: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <button 
+              onClick={handleSaveBs}
+              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
+            >
+              設定を反映する
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── カテゴリー編集・追加 モーダル ── */}
       {isCategoryModalOpen && (
@@ -629,8 +777,6 @@ export default function LifeOSDashboard() {
               <h3 className="font-bold text-sm text-[#3E4D27]">カテゴリー管理</h3>
               <button onClick={() => setIsCategoryModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
             </div>
-
-            {/* 新規追加フォーム */}
             <div className="flex gap-2">
               <input 
                 type="text"
@@ -646,8 +792,6 @@ export default function LifeOSDashboard() {
                 追加
               </button>
             </div>
-
-            {/* カテゴリー一覧と削除 */}
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
               <p className="text-[10px] font-bold text-gray-400">現在のカテゴリー (タップで削除)</p>
               <div className="flex flex-wrap gap-1.5">
