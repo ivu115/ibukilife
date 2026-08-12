@@ -3,16 +3,20 @@
 import React, { useState } from 'react'
 import { 
   Home, PlusCircle, CheckSquare, Bot, PiggyBank, Plus, Trash2, Edit3, Calendar as CalendarIcon, 
-  TrendingUp, Wallet, Check, X, Sparkles, Tag, Send, Loader2
+  TrendingUp, Wallet, Check, X, Sparkles, Tag, Send, Loader2, GraduationCap
 } from 'lucide-react'
 
 export default function LifeOSDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'input' | 'savings' | 'tasks' | 'ai'>('home')
 
-  // --- BS (純資産・資産・負債) の初期数値：ALL 0 ---
-  const [bsData, setBsData] = useState({ assets: 0, liabilities: 0 })
+  // --- BS (純資産・資産・負債・奨学金別枠) の初期数値：ALL 0 ---
+  const [bsData, setBsData] = useState({
+    assets: 0,        // 総資産 (現金・口座)
+    liabilities: 0,   // 日常の負債 (クレカ等)
+    scholarship: 0,   // 奨学金 (学生期間・別枠管理)
+  })
   const [isBsModalOpen, setIsBsModalOpen] = useState(false)
-  const [bsForm, setBsForm] = useState({ assets: '0', liabilities: '0' })
+  const [bsForm, setBsForm] = useState({ assets: '0', liabilities: '0', scholarship: '0' })
 
   // --- PL (今月の収支) の初期数値：ALL 0 ---
   const [plData, setPlData] = useState({ consumption: 0, waste: 0, investment: 0, savings: 0 })
@@ -26,7 +30,7 @@ export default function LifeOSDashboard() {
 
   // --- 目的別貯金 (初期状態：0) ---
   const [savingsGoals, setSavingsGoals] = useState([
-    { id: 1, name: '奨学金返済', target: 1000000, current: 0, targetDate: '2028-03-31' },
+    { id: 1, name: '奨学金返済用ポッド', target: 1000000, current: 0, targetDate: '2028-03-31' },
   ])
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState<any | null>(null)
@@ -43,7 +47,7 @@ export default function LifeOSDashboard() {
 
   // --- AIチャットState ---
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string }>>([
-    { sender: 'ai', text: 'おかえりなさい！いぶき経営者さん。今日の財務状況や目標、タスクについて何でも相談してくださいね！🍵' }
+    { sender: 'ai', text: 'おかえりなさい！いぶき経営者さん。奨学金は別枠でしっかり管理しつつ、日々の純資産を増やしていきましょうね！🍵' }
   ])
   const [chatInput, setChatInput] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
@@ -59,7 +63,8 @@ export default function LifeOSDashboard() {
   const handleSaveBs = () => {
     setBsData({
       assets: Number(bsForm.assets || 0),
-      liabilities: Number(bsForm.liabilities || 0)
+      liabilities: Number(bsForm.liabilities || 0),
+      scholarship: Number(bsForm.scholarship || 0),
     })
     setIsBsModalOpen(false)
   }
@@ -180,6 +185,7 @@ export default function LifeOSDashboard() {
             netWorth,
             assets: bsData.assets,
             liabilities: bsData.liabilities,
+            scholarship: bsData.scholarship,
             totalExpense,
             consumption: plData.consumption,
             waste: plData.waste,
@@ -241,13 +247,13 @@ export default function LifeOSDashboard() {
     setActiveTab('home')
   }
 
-  // 動的計算プロパティ
+  // 動的計算プロパティ（※純資産の計算には日常の負債のみを使用。奨学金は別枠除外！）
   const totalExpense = plData.consumption + plData.waste + plData.investment
   const consumptionRatio = totalExpense > 0 ? Math.round((plData.consumption / totalExpense) * 100) : 0
   const wasteRatio = totalExpense > 0 ? Math.round((plData.waste / totalExpense) * 100) : 0
   const investmentRatio = totalExpense > 0 ? Math.round((plData.investment / totalExpense) * 100) : 0
 
-  const netWorth = bsData.assets - bsData.liabilities
+  const netWorth = bsData.assets - bsData.liabilities // 奨学金は引かない！
 
   const totalSavingsTarget = savingsGoals.reduce((sum, g) => sum + g.target, 0)
   const totalSavingsCurrent = savingsGoals.reduce((sum, g) => sum + g.current, 0)
@@ -275,13 +281,13 @@ export default function LifeOSDashboard() {
         {/* ================= HOME TAB ================= */}
         {activeTab === 'home' && (
           <>
-            {/* BS 純資産カード */}
+            {/* BS 純資産カード (奨学金別枠バージョン) */}
             <div className="bg-gradient-to-br from-[#5b7039] to-[#3B4A23] text-[#F8F9F5] p-6 rounded-3xl shadow-xl space-y-4 relative overflow-hidden">
               <div className="flex justify-between items-center text-xs text-[#D1DCB8] font-bold">
-                <span className="flex items-center gap-1"><Wallet className="w-4 h-4"/> 純資産 (BS)</span>
+                <span className="flex items-center gap-1"><Wallet className="w-4 h-4"/> 日常純資産 (BS)</span>
                 <button 
                   onClick={() => {
-                    setBsForm({ assets: String(bsData.assets), liabilities: String(bsData.liabilities) })
+                    setBsForm({ assets: String(bsData.assets), liabilities: String(bsData.liabilities), scholarship: String(bsData.scholarship) })
                     setIsBsModalOpen(true)
                   }}
                   className="bg-white/20 text-white px-2.5 py-0.5 rounded-full font-bold text-[10px] hover:bg-white/30 transition-all flex items-center gap-1"
@@ -290,18 +296,31 @@ export default function LifeOSDashboard() {
                 </button>
               </div>
               <div>
-                <p className="text-xs text-[#D1DCB8]">現在の純資産</p>
+                <p className="text-xs text-[#D1DCB8]">現在の日常純資産 (奨学金除く)</p>
                 <p className="text-3xl font-black tracking-tight">¥{netWorth.toLocaleString()}</p>
               </div>
-              <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
-                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
-                  <p className="text-[#D1DCB8]">総資産</p>
+              
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/10 p-2.5 rounded-2xl backdrop-blur-sm">
+                  <p className="text-[#D1DCB8] text-[10px]">総資産 (現金・口座)</p>
                   <p className="font-bold text-sm">¥{bsData.assets.toLocaleString()}</p>
                 </div>
-                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm">
-                  <p className="text-[#D1DCB8]">負債 (奨学金等)</p>
+                <div className="bg-white/10 p-2.5 rounded-2xl backdrop-blur-sm">
+                  <p className="text-[#D1DCB8] text-[10px]">日常の負債 (クレカ等)</p>
                   <p className="font-bold text-sm">¥{bsData.liabilities.toLocaleString()}</p>
                 </div>
+              </div>
+
+              {/* 奨学金の別枠管理エリア */}
+              <div className="bg-black/20 p-3 rounded-2xl border border-white/10 flex justify-between items-center text-xs">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-[#F4C430]"/>
+                  <div>
+                    <p className="font-bold text-[11px] text-white">奨学金 (学生期間・別枠管理)</p>
+                    <p className="text-[9px] text-[#D1DCB8]">※純資産マイナス計算から除外中</p>
+                  </div>
+                </div>
+                <p className="font-black text-sm text-[#F4C430]">¥{bsData.scholarship.toLocaleString()}</p>
               </div>
             </div>
 
@@ -665,7 +684,6 @@ export default function LifeOSDashboard() {
         {/* ================= AI TAB (対話型 AI顧問 抹茶さん) ================= */}
         {activeTab === 'ai' && (
           <div className="space-y-4">
-            {/* AIヘッダー */}
             <div className="bg-gradient-to-r from-[#3E4D27] to-[#5b7039] text-white p-5 rounded-3xl shadow-lg space-y-2">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl shadow-inner border border-white/30">
@@ -680,9 +698,7 @@ export default function LifeOSDashboard() {
               </div>
             </div>
 
-            {/* チャット対話エリア */}
             <div className="bg-white rounded-3xl p-4 shadow-sm border border-[#E8EDE0] space-y-3 min-h-[320px] flex flex-col justify-between">
-              {/* 吹き出し一覧 */}
               <div className="space-y-3 overflow-y-auto max-h-[300px] p-1">
                 {chatMessages.map((msg, idx) => (
                   <div key={idx} className={`flex gap-2 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -707,7 +723,6 @@ export default function LifeOSDashboard() {
                 )}
               </div>
 
-              {/* チャット入力欄 */}
               <div className="flex gap-2 pt-2 border-t border-gray-100">
                 <input 
                   type="text"
@@ -731,7 +746,7 @@ export default function LifeOSDashboard() {
 
       </main>
 
-      {/* ── BS 設定 モーダル ── */}
+      {/* ── BS (資産・負債・奨学金別枠) 設定 モーダル ── */}
       {isBsModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
           <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
@@ -750,13 +765,26 @@ export default function LifeOSDashboard() {
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold text-gray-400">現在の負債 (奨学金・ローンなど)</label>
+              <label className="text-[10px] font-bold text-gray-400">日常の負債 (クレカ未払金等)</label>
               <input 
                 type="number"
                 placeholder="0"
                 value={bsForm.liabilities}
                 onChange={(e) => setBsForm({ ...bsForm, liabilities: e.target.value })}
                 className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-[#4B7092] flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5"/> 奨学金 (学生期間・別枠管理)
+              </label>
+              <p className="text-[9px] text-gray-400 mb-1">※日常純資産のマイナス計算から除外されます</p>
+              <input 
+                type="number"
+                placeholder="0"
+                value={bsForm.scholarship}
+                onChange={(e) => setBsForm({ ...bsForm, scholarship: e.target.value })}
+                className="w-full p-3 bg-[#F0F5FA] rounded-2xl text-xs font-bold border border-[#D0E0F0] outline-none text-[#2C3527]"
               />
             </div>
             <button 
