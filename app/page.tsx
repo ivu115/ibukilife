@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   Home, PlusCircle, CheckSquare, Bot, PiggyBank, Plus, Trash2, Edit3, Calendar as CalendarIcon, 
   TrendingUp, Wallet, Check, X, Sparkles, Tag, Send, Loader2, GraduationCap
@@ -8,27 +8,24 @@ import {
 
 export default function LifeOSDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'input' | 'savings' | 'tasks' | 'ai'>('home')
+  const [isLoaded, setIsLoaded] = useState(false)
 
-  // --- BS (純資産・資産・負債・奨学金別枠) の初期数値：ALL 0 ---
-  const [bsData, setBsData] = useState({
-    assets: 0,        // 総資産 (現金・口座)
-    liabilities: 0,   // 日常の負債 (クレカ等)
-    scholarship: 0,   // 奨学金 (学生期間・別枠管理)
-  })
+  // --- BS (純資産・資産・負債・奨学金別枠) ---
+  const [bsData, setBsData] = useState({ assets: 0, liabilities: 0, scholarship: 0 })
   const [isBsModalOpen, setIsBsModalOpen] = useState(false)
   const [bsForm, setBsForm] = useState({ assets: '0', liabilities: '0', scholarship: '0' })
 
-  // --- PL (今月の収支) の初期数値：ALL 0 ---
+  // --- PL (今月の収支) ---
   const [plData, setPlData] = useState({ consumption: 0, waste: 0, investment: 0, savings: 0 })
 
-  // --- カテゴリー (初期セット) ---
+  // --- カテゴリー ---
   const [categories, setCategories] = useState<string[]>([
     '食費', '日用品', '交際費', '固定費', '自己投資', '趣味・娯楽'
   ])
   const [newCategoryInput, setNewCategoryInput] = useState('')
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
-  // --- 目的別貯金 (初期状態：0) ---
+  // --- 目的別貯金 ---
   const [savingsGoals, setSavingsGoals] = useState([
     { id: 1, name: '奨学金返済用ポッド', target: 1000000, current: 0, targetDate: '2028-03-31' },
   ])
@@ -36,7 +33,7 @@ export default function LifeOSDashboard() {
   const [editingGoal, setEditingGoal] = useState<any | null>(null)
   const [goalForm, setGoalForm] = useState({ name: '', target: '', current: '0', targetDate: '' })
 
-  // --- タスク (初期状態) ---
+  // --- タスク ---
   const [tasks, setTasks] = useState([
     { id: 1, title: '初日の収支を記録する', category: 'お金', priority: '高', dueDate: new Date().toISOString().split('T')[0], completed: false },
   ])
@@ -47,7 +44,7 @@ export default function LifeOSDashboard() {
 
   // --- AIチャットState ---
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string }>>([
-    { sender: 'ai', text: 'おかえりなさい！いぶき経営者さん。奨学金は別枠でしっかり管理しつつ、日々の純資産を増やしていきましょうね！🍵' }
+    { sender: 'ai', text: 'おかえりなさい！いぶき経営者さん。今日の財務状況や目標、タスクについて何でも相談してくださいね！🍵' }
   ])
   const [chatInput, setChatInput] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
@@ -55,9 +52,55 @@ export default function LifeOSDashboard() {
   // --- 収支入力State ---
   const [inputAmount, setInputAmount] = useState('')
   const [inputType, setInputType] = useState<'消費' | '浪費' | '投資' | '貯金'>('消費')
-  const [selectedCategory, setSelectedCategory] = useState(categories[0])
+  const [selectedCategory, setSelectedCategory] = useState(categories[0] || '食費')
   const [selectedSavingsGoal, setSelectedSavingsGoal] = useState(savingsGoals[0]?.name || '')
   const [inputMemo, setInputMemo] = useState('')
+
+  // ================= 💾 自動保存・自動復元 (localStorage) =================
+  // 初回起動時：スマホ保存領域からデータを復元
+  useEffect(() => {
+    try {
+      const savedBs = localStorage.getItem('ibuki_bsData')
+      if (savedBs) setBsData(JSON.parse(savedBs))
+
+      const savedPl = localStorage.getItem('ibuki_plData')
+      if (savedPl) setPlData(JSON.parse(savedPl))
+
+      const savedCat = localStorage.getItem('ibuki_categories')
+      if (savedCat) setCategories(JSON.parse(savedCat))
+
+      const savedGoals = localStorage.getItem('ibuki_savingsGoals')
+      if (savedGoals) setSavingsGoals(JSON.parse(savedGoals))
+
+      const savedTasks = localStorage.getItem('ibuki_tasks')
+      if (savedTasks) setTasks(JSON.parse(savedTasks))
+    } catch (e) {
+      console.error('Failed to load from localStorage', e)
+    } finally {
+      setIsLoaded(true)
+    }
+  }, [])
+
+  // 変更検知時：自動保存
+  useEffect(() => {
+    if (isLoaded) localStorage.setItem('ibuki_bsData', JSON.stringify(bsData))
+  }, [bsData, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded) localStorage.setItem('ibuki_plData', JSON.stringify(plData))
+  }, [plData, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded) localStorage.setItem('ibuki_categories', JSON.stringify(categories))
+  }, [categories, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded) localStorage.setItem('ibuki_savingsGoals', JSON.stringify(savingsGoals))
+  }, [savingsGoals, isLoaded])
+
+  useEffect(() => {
+    if (isLoaded) localStorage.setItem('ibuki_tasks', JSON.stringify(tasks))
+  }, [tasks, isLoaded])
 
   // ----------------【BS操作】----------------
   const handleSaveBs = () => {
@@ -247,13 +290,13 @@ export default function LifeOSDashboard() {
     setActiveTab('home')
   }
 
-  // 動的計算プロパティ（※純資産の計算には日常の負債のみを使用。奨学金は別枠除外！）
+  // 動的計算プロパティ
   const totalExpense = plData.consumption + plData.waste + plData.investment
   const consumptionRatio = totalExpense > 0 ? Math.round((plData.consumption / totalExpense) * 100) : 0
   const wasteRatio = totalExpense > 0 ? Math.round((plData.waste / totalExpense) * 100) : 0
   const investmentRatio = totalExpense > 0 ? Math.round((plData.investment / totalExpense) * 100) : 0
 
-  const netWorth = bsData.assets - bsData.liabilities // 奨学金は引かない！
+  const netWorth = bsData.assets - bsData.liabilities
 
   const totalSavingsTarget = savingsGoals.reduce((sum, g) => sum + g.target, 0)
   const totalSavingsCurrent = savingsGoals.reduce((sum, g) => sum + g.current, 0)
@@ -281,7 +324,7 @@ export default function LifeOSDashboard() {
         {/* ================= HOME TAB ================= */}
         {activeTab === 'home' && (
           <>
-            {/* BS 純資産カード (奨学金別枠バージョン) */}
+            {/* BS 純資産カード */}
             <div className="bg-gradient-to-br from-[#5b7039] to-[#3B4A23] text-[#F8F9F5] p-6 rounded-3xl shadow-xl space-y-4 relative overflow-hidden">
               <div className="flex justify-between items-center text-xs text-[#D1DCB8] font-bold">
                 <span className="flex items-center gap-1"><Wallet className="w-4 h-4"/> 日常純資産 (BS)</span>
@@ -311,7 +354,6 @@ export default function LifeOSDashboard() {
                 </div>
               </div>
 
-              {/* 奨学金の別枠管理エリア */}
               <div className="bg-black/20 p-3 rounded-2xl border border-white/10 flex justify-between items-center text-xs">
                 <div className="flex items-center gap-2">
                   <GraduationCap className="w-4 h-4 text-[#F4C430]"/>
