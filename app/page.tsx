@@ -20,7 +20,7 @@ export default function LifeOSDashboard() {
 
   // --- カテゴリー ---
   const [categories, setCategories] = useState<string[]>([
-    '食費', '日用品', '交際費', '固定費', '自己投資', '趣味・娯楽'
+    '食費', '日用品', '交際費', '固定費', '自己投資', '趣味・娯楽', '給与・バイト'
   ])
   const [newCategoryInput, setNewCategoryInput] = useState('')
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
@@ -49,15 +49,14 @@ export default function LifeOSDashboard() {
   const [chatInput, setChatInput] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
 
-  // --- 収支入力State ---
+  // --- 収支入力State（「収入」を追加！） ---
   const [inputAmount, setInputAmount] = useState('')
-  const [inputType, setInputType] = useState<'消費' | '浪費' | '投資' | '貯金'>('消費')
+  const [inputType, setInputType] = useState<'収入' | '消費' | '浪費' | '投資' | '貯金'>('消費')
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || '食費')
   const [selectedSavingsGoal, setSelectedSavingsGoal] = useState(savingsGoals[0]?.name || '')
   const [inputMemo, setInputMemo] = useState('')
 
   // ================= 💾 自動保存・自動復元 (localStorage) =================
-  // 初回起動時：スマホ保存領域からデータを復元
   useEffect(() => {
     try {
       const savedBs = localStorage.getItem('ibuki_bsData')
@@ -81,7 +80,6 @@ export default function LifeOSDashboard() {
     }
   }, [])
 
-  // 変更検知時：自動保存
   useEffect(() => {
     if (isLoaded) localStorage.setItem('ibuki_bsData', JSON.stringify(bsData))
   }, [bsData, isLoaded])
@@ -245,23 +243,29 @@ export default function LifeOSDashboard() {
     }
   }
 
-  // 収支記録送信
+  // ----------------【収支記録送信（BS・PL連動修正版）】----------------
   const handleRecordTransaction = async () => {
     if (!inputAmount) return
     const amount = Number(inputAmount)
 
-    if (inputType === '消費') setPlData(prev => ({ ...prev, consumption: prev.consumption + amount }))
-    if (inputType === '浪費') setPlData(prev => ({ ...prev, waste: prev.waste + amount }))
-    if (inputType === '投資') setPlData(prev => ({ ...prev, investment: prev.investment + amount }))
-    
-    if (inputType === '貯金') {
+    if (inputType === '収入') {
+      // 収入：日常純資産（総資産）が加算増額！
+      setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
+    } else if (inputType === '消費') {
+      setPlData(prev => ({ ...prev, consumption: prev.consumption + amount }))
+      setBsData(prev => ({ ...prev, assets: prev.assets - amount })) // 支出：総資産から減額
+    } else if (inputType === '浪費') {
+      setPlData(prev => ({ ...prev, waste: prev.waste + amount }))
+      setBsData(prev => ({ ...prev, assets: prev.assets - amount }))
+    } else if (inputType === '投資') {
+      setPlData(prev => ({ ...prev, investment: prev.investment + amount }))
+      setBsData(prev => ({ ...prev, assets: prev.assets - amount }))
+    } else if (inputType === '貯金') {
       setPlData(prev => ({ ...prev, savings: prev.savings + amount }))
       if (selectedSavingsGoal) {
         setSavingsGoals(savingsGoals.map(g => g.name === selectedSavingsGoal ? { ...g, current: g.current + amount } : g))
       }
       setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
-    } else {
-      setBsData(prev => ({ ...prev, assets: Math.max(0, prev.assets - amount) }))
     }
 
     try {
@@ -454,14 +458,16 @@ export default function LifeOSDashboard() {
               <PlusCircle className="w-5 h-5 text-[#5b7039]"/> 収支・貯金の記録
             </h2>
 
-            <div className="grid grid-cols-4 gap-2">
-              {(['消費', '浪費', '投資', '貯金'] as const).map(type => (
+            {/* 区分選択（「収入」を追加！） */}
+            <div className="grid grid-cols-5 gap-1.5">
+              {(['収入', '消費', '浪費', '投資', '貯金'] as const).map(type => (
                 <button
                   key={type}
                   onClick={() => setInputType(type)}
-                  className={`py-2 text-xs font-black rounded-2xl transition-all ${
+                  className={`py-2 text-[11px] font-black rounded-2xl transition-all ${
                     inputType === type 
-                      ? type === '消費' ? 'bg-[#5b7039] text-white'
+                      ? type === '収入' ? 'bg-[#3E4D27] text-white'
+                      : type === '消費' ? 'bg-[#5b7039] text-white'
                       : type === '浪費' ? 'bg-[#F3A2B8] text-white'
                       : type === '投資' ? 'bg-[#F4C430] text-[#2C3527]'
                       : 'bg-[#4B7092] text-white'
