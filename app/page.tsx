@@ -219,7 +219,6 @@ export default function LifeOSDashboard() {
     if (!tx) return
     if (!confirm(`【${tx.type}】¥${tx.amount.toLocaleString()} の記録を削除しますか？`)) return
 
-    // 削除に伴うBS/PLの巻き戻し
     if (tx.type === '収入') setBsData(prev => ({ ...prev, assets: Math.max(0, prev.assets - tx.amount) }))
     if (tx.type === '消費') {
       setPlData(prev => ({ ...prev, consumption: Math.max(0, prev.consumption - tx.amount) }))
@@ -290,13 +289,12 @@ export default function LifeOSDashboard() {
     }
   }
 
-  // ----------------【収支記録送信（スプレッドシート＆履歴連携）】----------------
+  // ----------------【収支記録送信】----------------
   const handleRecordTransaction = async () => {
     if (!inputAmount) return
     const amount = Number(inputAmount)
     const todayStr = new Date().toISOString().split('T')[0]
 
-    // 新規ログ作成
     const newTx: Transaction = {
       id: Date.now(),
       date: todayStr,
@@ -308,7 +306,6 @@ export default function LifeOSDashboard() {
     }
     setTransactions([newTx, ...transactions])
 
-    // BS/PL連動
     if (inputType === '収入') {
       setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
     } else if (inputType === '消費') {
@@ -328,7 +325,6 @@ export default function LifeOSDashboard() {
       setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
     }
 
-    // スプレッドシートへ送信
     try {
       const res = await fetch('/api/sheet', {
         method: 'POST',
@@ -476,7 +472,7 @@ export default function LifeOSDashboard() {
               </div>
             </div>
 
-            {/* 直近の収支履歴エリア（編集・削除可能！） */}
+            {/* 直近の収支履歴エリア */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-[#E8EDE0] space-y-3">
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-sm text-[#3E4D27] flex items-center gap-1">
@@ -834,3 +830,344 @@ export default function LifeOSDashboard() {
                         🍵
                       </div>
                     )}
+                    <div className={`p-3 rounded-2xl text-xs font-bold max-w-[80%] leading-relaxed ${
+                      msg.sender === 'user' 
+                        ? 'bg-[#5b7039] text-white rounded-br-none shadow-sm' 
+                        : 'bg-[#F2F5ED] text-[#2C3527] rounded-bl-none border border-[#E2E6D8]'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))}
+                {isAiLoading && (
+                  <div className="flex gap-2 items-center text-xs text-gray-400 font-bold p-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-[#5b7039]"/> 抹茶さんが考え中...
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-gray-100">
+                <input 
+                  type="text"
+                  placeholder="今月の節約アドバイスをちょうだい..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendChatMessage()}
+                  className="flex-1 bg-[#F8F9F5] px-4 py-3 rounded-2xl text-xs font-bold outline-none border border-[#E2E6D8]"
+                />
+                <button 
+                  onClick={handleSendChatMessage}
+                  disabled={isAiLoading}
+                  className="bg-[#5b7039] text-white p-3 rounded-2xl hover:bg-[#4A5D2C] transition-all shadow-md shrink-0 disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4"/>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* ── 収支履歴編集 モーダル ── */}
+      {isTxModalOpen && editingTx && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-[#3E4D27]">収支記録の編集</h3>
+              <button onClick={() => setIsTxModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">金額 (円)</label>
+              <input 
+                type="number"
+                value={editingTx.amount}
+                onChange={(e) => setEditingTx({ ...editingTx, amount: Number(e.target.value) })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">カテゴリー</label>
+              <select 
+                value={editingTx.category}
+                onChange={(e) => setEditingTx({ ...editingTx, category: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
+              >
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">メモ</label>
+              <input 
+                type="text"
+                value={editingTx.memo || ''}
+                onChange={(e) => setEditingTx({ ...editingTx, memo: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <button 
+              onClick={handleSaveEditedTx}
+              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
+            >
+              変更を保存する
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── BS (資産・負債・奨学金別枠) 設定 モーダル ── */}
+      {isBsModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-[#3E4D27]">初期資産・負債の設定</h3>
+              <button onClick={() => setIsBsModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">現在の総資産 (銀行口座・現金など)</label>
+              <input 
+                type="number"
+                placeholder="0"
+                value={bsForm.assets}
+                onChange={(e) => setBsForm({ ...bsForm, assets: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">日常の負債 (クレカ未払金等)</label>
+              <input 
+                type="number"
+                placeholder="0"
+                value={bsForm.liabilities}
+                onChange={(e) => setBsForm({ ...bsForm, liabilities: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-[#4B7092] flex items-center gap-1">
+                <GraduationCap className="w-3.5 h-3.5"/> 奨学金 (学生期間・別枠管理)
+              </label>
+              <p className="text-[9px] text-gray-400 mb-1">※日常純資産のマイナス計算から除外されます</p>
+              <input 
+                type="number"
+                placeholder="0"
+                value={bsForm.scholarship}
+                onChange={(e) => setBsForm({ ...bsForm, scholarship: e.target.value })}
+                className="w-full p-3 bg-[#F0F5FA] rounded-2xl text-xs font-bold border border-[#D0E0F0] outline-none text-[#2C3527]"
+              />
+            </div>
+            <button 
+              onClick={handleSaveBs}
+              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
+            >
+              設定を反映する
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── カテゴリー編集・追加 モーダル ── */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-[#3E4D27]">カテゴリー管理</h3>
+              <button onClick={() => setIsCategoryModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="text"
+                placeholder="新しいカテゴリー"
+                value={newCategoryInput}
+                onChange={(e) => setNewCategoryInput(e.target.value)}
+                className="w-full p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+              <button 
+                onClick={handleAddCategory}
+                className="px-4 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shrink-0"
+              >
+                追加
+              </button>
+            </div>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <p className="text-[10px] font-bold text-gray-400">現在のカテゴリー (タップで削除)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map(cat => (
+                  <span 
+                    key={cat} 
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F2F5ED] text-xs font-bold text-[#3E4D27] rounded-xl"
+                  >
+                    {cat}
+                    <button onClick={() => handleDeleteCategory(cat)} className="text-gray-400 hover:text-red-500">
+                      <X className="w-3 h-3"/>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 貯金目標（新規・編集） モーダル ── */}
+      {isGoalModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-[#3E4D27]">
+                {editingGoal ? '貯金目標の編集' : '新規貯金目標を追加'}
+              </h3>
+              <button onClick={() => setIsGoalModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">目標名</label>
+              <input 
+                type="text"
+                placeholder="例: 車の買い替え"
+                value={goalForm.name}
+                onChange={(e) => setGoalForm({ ...goalForm, name: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">目標金額 (円)</label>
+              <input 
+                type="number"
+                placeholder="目標金額"
+                value={goalForm.target}
+                onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">現在の蓄積額 (円)</label>
+              <input 
+                type="number"
+                placeholder="現在の貯蓄額"
+                value={goalForm.current}
+                onChange={(e) => setGoalForm({ ...goalForm, current: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">目標達成日</label>
+              <input 
+                type="date"
+                value={goalForm.targetDate}
+                onChange={(e) => setGoalForm({ ...goalForm, targetDate: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
+              />
+            </div>
+            <button 
+              onClick={handleSaveGoal}
+              className="w-full py-3 bg-[#4B7092] text-white font-bold text-xs rounded-2xl shadow-md"
+            >
+              {editingGoal ? '変更を保存する' : '目標を作成する'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── タスク（新規・編集） モーダル ── */}
+      {isTaskModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
+          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="font-bold text-sm text-[#3E4D27]">
+                {editingTask ? 'タスクの編集' : 'タスクを追加'}
+              </h3>
+              <button onClick={() => setIsTaskModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
+            </div>
+            <input 
+              type="text"
+              placeholder="タスク内容"
+              value={taskForm.title}
+              onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
+              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
+            />
+            <div className="flex gap-2">
+              <select 
+                value={taskForm.category}
+                onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
+                className="w-1/2 p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
+              >
+                <option value="お金">お金</option>
+                <option value="仕事・キャリア">仕事</option>
+                <option value="健康・生活">健康</option>
+                <option value="自己投資">自己投資</option>
+              </select>
+              <select 
+                value={taskForm.priority}
+                onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
+                className="w-1/2 p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
+              >
+                <option value="高">優先度: 高</option>
+                <option value="中">優先度: 中</option>
+                <option value="低">優先度: 低</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold text-gray-400">期限日</label>
+              <input 
+                type="date"
+                value={taskForm.dueDate}
+                onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
+                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
+              />
+            </div>
+            <button 
+              onClick={handleSaveTask}
+              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
+            >
+              {editingTask ? '変更を保存する' : 'タスクを追加する'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ボトムナビゲーションバー ── */}
+      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-md border-t border-[#E8EDE0] p-3 flex justify-around items-center z-40 rounded-t-3xl shadow-lg">
+        <button 
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
+        >
+          <Home className="w-5 h-5"/>
+          <span className="text-[10px]">ホーム</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('input')}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'input' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
+        >
+          <PlusCircle className="w-5 h-5"/>
+          <span className="text-[10px]">収支入力</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('savings')}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'savings' ? 'text-[#4B7092] font-black scale-105' : 'text-gray-400 font-bold'}`}
+        >
+          <PiggyBank className="w-5 h-5"/>
+          <span className="text-[10px]">貯金</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('tasks')}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'tasks' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
+        >
+          <CheckSquare className="w-5 h-5"/>
+          <span className="text-[10px]">タスク</span>
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('ai')}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'ai' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
+        >
+          <Bot className="w-5 h-5"/>
+          <span className="text-[10px]">AI顧問</span>
+        </button>
+      </nav>
+
+    </div>
+  )
+}
