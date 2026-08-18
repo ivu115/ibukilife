@@ -3,8 +3,18 @@
 import React, { useState, useEffect } from 'react'
 import { 
   Home, PlusCircle, CheckSquare, Bot, PiggyBank, Plus, Trash2, Edit3, Calendar as CalendarIcon, 
-  TrendingUp, Wallet, Check, X, Sparkles, Tag, Send, Loader2, GraduationCap
+  TrendingUp, Wallet, Check, X, Sparkles, Tag, Send, Loader2, GraduationCap, History
 } from 'lucide-react'
+
+interface Transaction {
+  id: number
+  date: string
+  type: '収入' | '消費' | '浪費' | '投資' | '貯金'
+  amount: number
+  category: string
+  savingsGoal?: string
+  memo?: string
+}
 
 export default function LifeOSDashboard() {
   const [activeTab, setActiveTab] = useState<'home' | 'input' | 'savings' | 'tasks' | 'ai'>('home')
@@ -17,6 +27,11 @@ export default function LifeOSDashboard() {
 
   // --- PL (今月の収支) ---
   const [plData, setPlData] = useState({ consumption: 0, waste: 0, investment: 0, savings: 0 })
+
+  // --- 収支履歴 (CRUD) ---
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [isTxModalOpen, setIsTxModalOpen] = useState(false)
 
   // --- カテゴリー ---
   const [categories, setCategories] = useState<string[]>([
@@ -49,7 +64,7 @@ export default function LifeOSDashboard() {
   const [chatInput, setChatInput] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
 
-  // --- 収支入力State（「収入」を追加！） ---
+  // --- 収支入力State ---
   const [inputAmount, setInputAmount] = useState('')
   const [inputType, setInputType] = useState<'収入' | '消費' | '浪費' | '投資' | '貯金'>('消費')
   const [selectedCategory, setSelectedCategory] = useState(categories[0] || '食費')
@@ -64,6 +79,9 @@ export default function LifeOSDashboard() {
 
       const savedPl = localStorage.getItem('ibuki_plData')
       if (savedPl) setPlData(JSON.parse(savedPl))
+
+      const savedTx = localStorage.getItem('ibuki_transactions')
+      if (savedTx) setTransactions(JSON.parse(savedTx))
 
       const savedCat = localStorage.getItem('ibuki_categories')
       if (savedCat) setCategories(JSON.parse(savedCat))
@@ -80,25 +98,12 @@ export default function LifeOSDashboard() {
     }
   }, [])
 
-  useEffect(() => {
-    if (isLoaded) localStorage.setItem('ibuki_bsData', JSON.stringify(bsData))
-  }, [bsData, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded) localStorage.setItem('ibuki_plData', JSON.stringify(plData))
-  }, [plData, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded) localStorage.setItem('ibuki_categories', JSON.stringify(categories))
-  }, [categories, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded) localStorage.setItem('ibuki_savingsGoals', JSON.stringify(savingsGoals))
-  }, [savingsGoals, isLoaded])
-
-  useEffect(() => {
-    if (isLoaded) localStorage.setItem('ibuki_tasks', JSON.stringify(tasks))
-  }, [tasks, isLoaded])
+  useEffect(() => { if (isLoaded) localStorage.setItem('ibuki_bsData', JSON.stringify(bsData)) }, [bsData, isLoaded])
+  useEffect(() => { if (isLoaded) localStorage.setItem('ibuki_plData', JSON.stringify(plData)) }, [plData, isLoaded])
+  useEffect(() => { if (isLoaded) localStorage.setItem('ibuki_transactions', JSON.stringify(transactions)) }, [transactions, isLoaded])
+  useEffect(() => { if (isLoaded) localStorage.setItem('ibuki_categories', JSON.stringify(categories)) }, [categories, isLoaded])
+  useEffect(() => { if (isLoaded) localStorage.setItem('ibuki_savingsGoals', JSON.stringify(savingsGoals)) }, [savingsGoals, isLoaded])
+  useEffect(() => { if (isLoaded) localStorage.setItem('ibuki_tasks', JSON.stringify(tasks)) }, [tasks, isLoaded])
 
   // ----------------【BS操作】----------------
   const handleSaveBs = () => {
@@ -208,6 +213,48 @@ export default function LifeOSDashboard() {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t))
   }
 
+  // ----------------【収支履歴の削除＆編集】----------------
+  const handleDeleteTransaction = (id: number) => {
+    const tx = transactions.find(t => t.id === id)
+    if (!tx) return
+    if (!confirm(`【${tx.type}】¥${tx.amount.toLocaleString()} の記録を削除しますか？`)) return
+
+    // 削除に伴うBS/PLの巻き戻し
+    if (tx.type === '収入') setBsData(prev => ({ ...prev, assets: Math.max(0, prev.assets - tx.amount) }))
+    if (tx.type === '消費') {
+      setPlData(prev => ({ ...prev, consumption: Math.max(0, prev.consumption - tx.amount) }))
+      setBsData(prev => ({ ...prev, assets: prev.assets + tx.amount }))
+    }
+    if (tx.type === '浪費') {
+      setPlData(prev => ({ ...prev, waste: Math.max(0, prev.waste - tx.amount) }))
+      setBsData(prev => ({ ...prev, assets: prev.assets + tx.amount }))
+    }
+    if (tx.type === '投資') {
+      setPlData(prev => ({ ...prev, investment: Math.max(0, prev.investment - tx.amount) }))
+      setBsData(prev => ({ ...prev, assets: prev.assets + tx.amount }))
+    }
+    if (tx.type === '貯金') {
+      setPlData(prev => ({ ...prev, savings: Math.max(0, prev.savings - tx.amount) }))
+      if (tx.savingsGoal) {
+        setSavingsGoals(savingsGoals.map(g => g.name === tx.savingsGoal ? { ...g, current: Math.max(0, g.current - tx.amount) } : g))
+      }
+      setBsData(prev => ({ ...prev, assets: Math.max(0, prev.assets - tx.amount) }))
+    }
+
+    setTransactions(transactions.filter(t => t.id !== id))
+  }
+
+  const handleOpenEditTxModal = (tx: Transaction) => {
+    setEditingTx(tx)
+    setIsTxModalOpen(true)
+  }
+
+  const handleSaveEditedTx = () => {
+    if (!editingTx) return
+    setTransactions(transactions.map(t => t.id === editingTx.id ? editingTx : t))
+    setIsTxModalOpen(false)
+  }
+
   // ----------------【AIチャット送信】----------------
   const handleSendChatMessage = async () => {
     if (!chatInput.trim() || isAiLoading) return
@@ -243,17 +290,30 @@ export default function LifeOSDashboard() {
     }
   }
 
-  // ----------------【収支記録送信（BS・PL連動修正版）】----------------
+  // ----------------【収支記録送信（スプレッドシート＆履歴連携）】----------------
   const handleRecordTransaction = async () => {
     if (!inputAmount) return
     const amount = Number(inputAmount)
+    const todayStr = new Date().toISOString().split('T')[0]
 
+    // 新規ログ作成
+    const newTx: Transaction = {
+      id: Date.now(),
+      date: todayStr,
+      type: inputType,
+      amount: amount,
+      category: selectedCategory,
+      savingsGoal: inputType === '貯金' ? selectedSavingsGoal : '',
+      memo: inputMemo,
+    }
+    setTransactions([newTx, ...transactions])
+
+    // BS/PL連動
     if (inputType === '収入') {
-      // 収入：日常純資産（総資産）が加算増額！
       setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
     } else if (inputType === '消費') {
       setPlData(prev => ({ ...prev, consumption: prev.consumption + amount }))
-      setBsData(prev => ({ ...prev, assets: prev.assets - amount })) // 支出：総資産から減額
+      setBsData(prev => ({ ...prev, assets: prev.assets - amount }))
     } else if (inputType === '浪費') {
       setPlData(prev => ({ ...prev, waste: prev.waste + amount }))
       setBsData(prev => ({ ...prev, assets: prev.assets - amount }))
@@ -268,8 +328,9 @@ export default function LifeOSDashboard() {
       setBsData(prev => ({ ...prev, assets: prev.assets + amount }))
     }
 
+    // スプレッドシートへ送信
     try {
-      await fetch('/api/sheet', {
+      const res = await fetch('/api/sheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -280,11 +341,16 @@ export default function LifeOSDashboard() {
             category: selectedCategory,
             savingsGoal: inputType === '貯金' ? selectedSavingsGoal : '',
             memo: inputMemo,
-            date: new Date().toISOString().split('T')[0]
+            date: todayStr
           }
         })
       })
-      alert(`【${inputType}】¥${amount.toLocaleString()} を記録し、スプレッドシートに保存しました！`)
+      const resData = await res.json()
+      if (res.ok && resData.success) {
+        alert(`【${inputType}】¥${amount.toLocaleString()} を記録し、スプレッドシートに保存しました！`)
+      } else {
+        alert(`【${inputType}】¥${amount.toLocaleString()} をアプリに記録しました（シート: ${resData.error || '通信エラー'}）`)
+      }
     } catch (e) {
       alert(`【${inputType}】¥${amount.toLocaleString()} を記録しました`)
     }
@@ -410,39 +476,53 @@ export default function LifeOSDashboard() {
               </div>
             </div>
 
-            {/* 本日のタスクサマリー */}
+            {/* 直近の収支履歴エリア（編集・削除可能！） */}
             <div className="bg-white p-5 rounded-3xl shadow-sm border border-[#E8EDE0] space-y-3">
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-sm text-[#3E4D27] flex items-center gap-1">
-                  <CheckSquare className="w-4 h-4 text-[#748B47]"/> 本日のタスク
+                  <History className="w-4 h-4 text-[#748B47]"/> 直近の収支履歴
                 </h3>
-                <span className="text-xs bg-[#F2F5ED] text-[#5b7039] font-bold px-2 py-0.5 rounded-full">
-                  {tasks.filter(t => t.completed).length} / {tasks.length} 完了
-                </span>
+                <span className="text-[10px] text-gray-400 font-bold">タップで編集・削除</span>
               </div>
 
-              <div className="space-y-2">
-                {tasks.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center py-2">タスクはありません</p>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {transactions.length === 0 ? (
+                  <p className="text-xs text-gray-400 text-center py-3">記録された履歴はありません</p>
                 ) : (
-                  tasks.slice(0, 3).map(task => (
-                    <div key={task.id} className="flex items-center justify-between p-3 bg-[#F9FAF6] rounded-2xl border border-[#EFEGE6]">
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => handleToggleTask(task.id)}
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
-                            task.completed ? 'bg-[#5b7039] border-[#5b7039] text-white' : 'border-gray-300'
-                          }`}
-                        >
-                          {task.completed && <Check className="w-3 h-3"/>}
-                        </button>
-                        <span className={`text-xs font-bold ${task.completed ? 'line-through text-gray-400' : 'text-[#3E4D27]'}`}>
-                          {task.title}
-                        </span>
+                  transactions.map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between p-3 bg-[#F9FAF6] rounded-2xl border border-[#EFEGE6]">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            tx.type === '収入' ? 'bg-[#3E4D27] text-white' :
+                            tx.type === '消費' ? 'bg-[#5b7039] text-white' :
+                            tx.type === '浪費' ? 'bg-[#F3A2B8] text-white' :
+                            tx.type === '投資' ? 'bg-[#F4C430] text-[#2C3527]' :
+                            'bg-[#4B7092] text-white'
+                          }`}>
+                            {tx.type}
+                          </span>
+                          <span className="text-xs font-black text-[#3E4D27]">¥{tx.amount.toLocaleString()}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-bold mt-1">
+                          {tx.date} | {tx.category} {tx.memo && `(${tx.memo})`}
+                        </p>
                       </div>
-                      <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-gray-200 font-bold text-gray-600">
-                        {task.category}
-                      </span>
+
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => handleOpenEditTxModal(tx)}
+                          className="p-1.5 text-gray-400 hover:text-[#5b7039] transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5"/>
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteTransaction(tx.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5"/>
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -458,7 +538,6 @@ export default function LifeOSDashboard() {
               <PlusCircle className="w-5 h-5 text-[#5b7039]"/> 収支・貯金の記録
             </h2>
 
-            {/* 区分選択（「収入」を追加！） */}
             <div className="grid grid-cols-5 gap-1.5">
               {(['収入', '消費', '浪費', '投資', '貯金'] as const).map(type => (
                 <button
@@ -755,298 +834,3 @@ export default function LifeOSDashboard() {
                         🍵
                       </div>
                     )}
-                    <div className={`p-3 rounded-2xl text-xs font-bold max-w-[80%] leading-relaxed ${
-                      msg.sender === 'user' 
-                        ? 'bg-[#5b7039] text-white rounded-br-none shadow-sm' 
-                        : 'bg-[#F2F5ED] text-[#2C3527] rounded-bl-none border border-[#E2E6D8]'
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                ))}
-                {isAiLoading && (
-                  <div className="flex gap-2 items-center text-xs text-gray-400 font-bold p-2">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#5b7039]"/> 抹茶さんが考え中...
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2 pt-2 border-t border-gray-100">
-                <input 
-                  type="text"
-                  placeholder="今月の節約アドバイスをちょうだい..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendChatMessage()}
-                  className="flex-1 bg-[#F8F9F5] px-4 py-3 rounded-2xl text-xs font-bold outline-none border border-[#E2E6D8]"
-                />
-                <button 
-                  onClick={handleSendChatMessage}
-                  disabled={isAiLoading}
-                  className="bg-[#5b7039] text-white p-3 rounded-2xl hover:bg-[#4A5D2C] transition-all shadow-md shrink-0 disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4"/>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-      </main>
-
-      {/* ── BS (資産・負債・奨学金別枠) 設定 モーダル ── */}
-      {isBsModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">初期資産・負債の設定</h3>
-              <button onClick={() => setIsBsModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">現在の総資産 (銀行口座・現金など)</label>
-              <input 
-                type="number"
-                placeholder="0"
-                value={bsForm.assets}
-                onChange={(e) => setBsForm({ ...bsForm, assets: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">日常の負債 (クレカ未払金等)</label>
-              <input 
-                type="number"
-                placeholder="0"
-                value={bsForm.liabilities}
-                onChange={(e) => setBsForm({ ...bsForm, liabilities: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-[#4B7092] flex items-center gap-1">
-                <GraduationCap className="w-3.5 h-3.5"/> 奨学金 (学生期間・別枠管理)
-              </label>
-              <p className="text-[9px] text-gray-400 mb-1">※日常純資産のマイナス計算から除外されます</p>
-              <input 
-                type="number"
-                placeholder="0"
-                value={bsForm.scholarship}
-                onChange={(e) => setBsForm({ ...bsForm, scholarship: e.target.value })}
-                className="w-full p-3 bg-[#F0F5FA] rounded-2xl text-xs font-bold border border-[#D0E0F0] outline-none text-[#2C3527]"
-              />
-            </div>
-            <button 
-              onClick={handleSaveBs}
-              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
-            >
-              設定を反映する
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── カテゴリー編集・追加 モーダル ── */}
-      {isCategoryModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">カテゴリー管理</h3>
-              <button onClick={() => setIsCategoryModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
-            </div>
-            <div className="flex gap-2">
-              <input 
-                type="text"
-                placeholder="新しいカテゴリー"
-                value={newCategoryInput}
-                onChange={(e) => setNewCategoryInput(e.target.value)}
-                className="w-full p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-              />
-              <button 
-                onClick={handleAddCategory}
-                className="px-4 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shrink-0"
-              >
-                追加
-              </button>
-            </div>
-            <div className="space-y-1.5 max-h-48 overflow-y-auto">
-              <p className="text-[10px] font-bold text-gray-400">現在のカテゴリー (タップで削除)</p>
-              <div className="flex flex-wrap gap-1.5">
-                {categories.map(cat => (
-                  <span 
-                    key={cat} 
-                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F2F5ED] text-xs font-bold text-[#3E4D27] rounded-xl"
-                  >
-                    {cat}
-                    <button onClick={() => handleDeleteCategory(cat)} className="text-gray-400 hover:text-red-500">
-                      <X className="w-3 h-3"/>
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 貯金目標（新規・編集） モーダル ── */}
-      {isGoalModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">
-                {editingGoal ? '貯金目標の編集' : '新規貯金目標を追加'}
-              </h3>
-              <button onClick={() => setIsGoalModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">目標名</label>
-              <input 
-                type="text"
-                placeholder="例: 車の買い替え"
-                value={goalForm.name}
-                onChange={(e) => setGoalForm({ ...goalForm, name: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">目標金額 (円)</label>
-              <input 
-                type="number"
-                placeholder="目標金額"
-                value={goalForm.target}
-                onChange={(e) => setGoalForm({ ...goalForm, target: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">現在の蓄積額 (円)</label>
-              <input 
-                type="number"
-                placeholder="現在の貯蓄額"
-                value={goalForm.current}
-                onChange={(e) => setGoalForm({ ...goalForm, current: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">目標達成日</label>
-              <input 
-                type="date"
-                value={goalForm.targetDate}
-                onChange={(e) => setGoalForm({ ...goalForm, targetDate: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
-              />
-            </div>
-            <button 
-              onClick={handleSaveGoal}
-              className="w-full py-3 bg-[#4B7092] text-white font-bold text-xs rounded-2xl shadow-md"
-            >
-              {editingGoal ? '変更を保存する' : '目標を作成する'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── タスク（新規・編集） モーダル ── */}
-      {isTaskModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-5 z-50">
-          <div className="bg-white p-6 rounded-3xl w-full max-w-xs space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="font-bold text-sm text-[#3E4D27]">
-                {editingTask ? 'タスクの編集' : 'タスクを追加'}
-              </h3>
-              <button onClick={() => setIsTaskModalOpen(false)}><X className="w-4 h-4 text-gray-400"/></button>
-            </div>
-            <input 
-              type="text"
-              placeholder="タスク内容"
-              value={taskForm.title}
-              onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-              className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none"
-            />
-            <div className="flex gap-2">
-              <select 
-                value={taskForm.category}
-                onChange={(e) => setTaskForm({ ...taskForm, category: e.target.value })}
-                className="w-1/2 p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
-              >
-                <option value="お金">お金</option>
-                <option value="仕事・キャリア">仕事</option>
-                <option value="健康・生活">健康</option>
-                <option value="自己投資">自己投資</option>
-              </select>
-              <select 
-                value={taskForm.priority}
-                onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value })}
-                className="w-1/2 p-2.5 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8]"
-              >
-                <option value="高">優先度: 高</option>
-                <option value="中">優先度: 中</option>
-                <option value="低">優先度: 低</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400">期限日</label>
-              <input 
-                type="date"
-                value={taskForm.dueDate}
-                onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-                className="w-full p-3 bg-[#F8F9F5] rounded-2xl text-xs font-bold border border-[#E2E6D8] outline-none text-gray-600"
-              />
-            </div>
-            <button 
-              onClick={handleSaveTask}
-              className="w-full py-3 bg-[#5b7039] text-white font-bold text-xs rounded-2xl shadow-md"
-            >
-              {editingTask ? '変更を保存する' : 'タスクを追加する'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── ボトムナビゲーションバー ── */}
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/90 backdrop-blur-md border-t border-[#E8EDE0] p-3 flex justify-around items-center z-40 rounded-t-3xl shadow-lg">
-        <button 
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
-        >
-          <Home className="w-5 h-5"/>
-          <span className="text-[10px]">ホーム</span>
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('input')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'input' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
-        >
-          <PlusCircle className="w-5 h-5"/>
-          <span className="text-[10px]">収支入力</span>
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('savings')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'savings' ? 'text-[#4B7092] font-black scale-105' : 'text-gray-400 font-bold'}`}
-        >
-          <PiggyBank className="w-5 h-5"/>
-          <span className="text-[10px]">貯金</span>
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('tasks')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'tasks' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
-        >
-          <CheckSquare className="w-5 h-5"/>
-          <span className="text-[10px]">タスク</span>
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('ai')}
-          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'ai' ? 'text-[#5b7039] font-black scale-105' : 'text-gray-400 font-bold'}`}
-        >
-          <Bot className="w-5 h-5"/>
-          <span className="text-[10px]">AI顧問</span>
-        </button>
-      </nav>
-
-    </div>
-  )
-}

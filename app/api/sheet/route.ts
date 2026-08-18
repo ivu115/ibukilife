@@ -9,11 +9,14 @@ export async function POST(req: Request) {
 
     const sheetId = process.env.GOOGLE_SHEET_ID
     const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
-    const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+    let privateKey = process.env.GOOGLE_PRIVATE_KEY
 
     if (!sheetId || !clientEmail || !privateKey) {
       return NextResponse.json({ error: '環境変数が未設定です' }, { status: 500 })
     }
+
+    // Vercelでの改行コードと引用符の自動クリーニング
+    privateKey = privateKey.replace(/^"|"$/g, '').replace(/\\n/g, '\n')
 
     const serviceAccountAuth = new JWT({
       email: clientEmail,
@@ -25,8 +28,9 @@ export async function POST(req: Request) {
     await doc.loadInfo()
 
     if (action === 'addTransaction') {
-      // PL_Logs タブへ追加
-      const sheet = doc.sheetsByTitle['PL_Logs']
+      // 'PL_Logs' タブ、なければ一番目のシート（シート1）を自動使用
+      let sheet = doc.sheetsByTitle['PL_Logs'] || doc.sheetsByIndex[0]
+
       if (sheet) {
         await sheet.addRow({
           '日付': data.date || new Date().toISOString().split('T')[0],
@@ -43,6 +47,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Sheet API Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'スプレッドシート連携エラー' }, { status: 500 })
   }
 }
