@@ -7,12 +7,18 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { action, data } = body
 
-    const sheetId = process.env.GOOGLE_SHEET_ID
+    let sheetId = process.env.GOOGLE_SHEET_ID || ''
     const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
     let privateKey = process.env.GOOGLE_PRIVATE_KEY
 
     if (!sheetId || !clientEmail || !privateKey) {
       return NextResponse.json({ error: '環境変数が未設定です' }, { status: 500 })
+    }
+
+    // URL全体が入力されている場合、IDの英数字だけを自動抽出
+    const match = sheetId.match(/\/d\/([a-zA-Z0-9-_]+)/)
+    if (match) {
+      sheetId = match[1]
     }
 
     // Vercelでの改行コードと引用符の自動クリーニング
@@ -28,7 +34,7 @@ export async function POST(req: Request) {
     await doc.loadInfo()
 
     if (action === 'addTransaction') {
-      // 'PL_Logs' タブ、なければ一番目のシート（シート1）を自動使用
+      // 'PL_Logs' タブ、なければ一番目のシートを自動選択
       let sheet = doc.sheetsByTitle['PL_Logs'] || doc.sheetsByIndex[0]
 
       if (sheet) {
